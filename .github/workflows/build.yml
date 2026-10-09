@@ -37,10 +37,18 @@ jobs:
 
       - name: Unit tests (non-blocking)
         continue-on-error: true
-        run: ./gradlew --stacktrace testDebugUnitTest
+        run: ./gradlew --console=plain testDebugUnitTest 2>&1 | tee test.log
 
       - name: Build (release + debug fallback)
-        run: ./gradlew --stacktrace assembleRelease assembleDebug
+        run: ./gradlew --console=plain assembleRelease assembleDebug 2>&1 | tee build.log; test ${PIPESTATUS[0]} -eq 0
+
+      - name: Compact error summary
+        if: failure()
+        run: |
+          echo "=== COMPILER / BUILD ERRORS (compact) ==="
+          grep -h -E "^e: |^w: .*(error|unresolved)|error:|AAPT|Execution failed|What went wrong|> .*(not found|Could not)" build.log test.log 2>/dev/null \
+            | sed -E 's#file:///home/runner/work/dotline/dotline/app/src/main/(kotlin/com/dotline/launcher/)?##' | sort -u | head -150
+          echo "=== END ERRORS ==="
 
       - name: Collect APKs
         run: |
