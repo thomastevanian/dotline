@@ -24,7 +24,6 @@ import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
-import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -32,7 +31,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.dotline.launcher.core.CrashLog
 import com.dotline.launcher.data.LayoutIds
 import com.dotline.launcher.data.model.AppInfo
-import com.dotline.launcher.data.model.HomeLayout
 import com.dotline.launcher.home.DragItemInfo
 import com.dotline.launcher.home.DragSource
 import com.dotline.launcher.home.DropTarget

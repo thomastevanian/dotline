@@ -20,6 +20,7 @@ import com.dotline.launcher.data.model.FolderItem
 import com.dotline.launcher.data.model.HomeLayout
 import com.dotline.launcher.data.model.HostedWidgetItem
 import com.dotline.launcher.home.DragSource
+import com.dotline.launcher.home.DropOutcome
 import com.dotline.launcher.home.GestureConfig
 import com.dotline.launcher.home.GestureEngine
 import com.dotline.launcher.home.GestureOutput
@@ -263,6 +264,7 @@ internal class HomeGestureHost(
             return
         }
         val outcome = controller.endDrag(x, y, geo, pager.logicalPage)
+        if (outcome is DropOutcome.FolderCreated || outcome is DropOutcome.AddedToFolder) haptic()
         actions.applyDrop(outcome)
     }
 
