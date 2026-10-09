@@ -48,8 +48,8 @@ object GlyphsSystem {
         ),
         entry(
             glyph("clock") {
-                circle(12f, 12f, 8.5f)
-                poly(12f, 7.2f, 12f, 12f, 15.4f, 14f)
+                circle(12f, 12f, 8.3f)
+                poly(12f, 7.4f, 12f, 12f, 15.3f, 14f)
             },
             "com.sec.android.app.clockpackage", "com.google.android.deskclock", "com.android.deskclock",
         ),
@@ -66,10 +66,10 @@ object GlyphsSystem {
         ),
         entry(
             glyph("calculator") {
-                rect(5f, 3.5f, 14f, 17f, 3f)
+                rect(4.5f, 3.5f, 15f, 17f, 3f)
                 line(8.5f, 8f, 15.5f, 8f)
-                dot(9f, 12.5f); dot(12f, 12.5f); dot(15f, 12.5f)
-                dot(9f, 16.5f); dot(12f, 16.5f); dot(15f, 16.5f)
+                dot(8.5f, 12.5f); dot(12f, 12.5f); dot(15.5f, 12.5f)
+                dot(8.5f, 16.5f); dot(12f, 16.5f); dot(15.5f, 16.5f)
             },
             "com.sec.android.app.popupcalculator", "com.google.android.calculator", "com.android.calculator2",
         ),
@@ -101,7 +101,11 @@ object GlyphsSystem {
         entry(
             glyph("contacts") {
                 circle(12f, 7.2f, 3.4f)
-                arc(12f, 20.5f, 7.5f, 180f, 180f)
+                path {
+                    move(4.5f, 20.5f)
+                    cubic(4.5f, 16.4f, 7.9f, 13f, 12f, 13f)
+                    cubic(16.1f, 13f, 19.5f, 16.4f, 19.5f, 20.5f)
+                }
             },
             "com.samsung.android.app.contacts", "com.google.android.contacts", "com.android.contacts",
         ),
@@ -117,16 +121,17 @@ object GlyphsSystem {
         entry(
             glyph("weather") {
                 // cloud: flat base + three arcs
-                line(7.6f, 19.5f, 17.8f, 19.5f)
-                arc(7.6f, 16.6f, 2.9f, 90f, 194f)
-                arc(13f, 13.6f, 4.7f, 177.7f, 173.8f)
-                arc(17.8f, 16.2f, 3.3f, 267.4f, 182.6f)
-                // sun peeking out behind it
-                arc(8.6f, 8.6f, 2.6f, 135f, 185f)
-                line(4.2f, 8.6f, 3.2f, 8.6f)
-                line(5.5f, 5.5f, 4.8f, 4.8f)
-                line(8.6f, 4.2f, 8.6f, 3.2f)
-                line(11.7f, 5.5f, 12.4f, 4.8f)
+                line(10.6f, 19.5f, 18.2f, 19.5f)
+                arc(10.6f, 17f, 2.5f, 90f, 175.4f)
+                arc(14.4f, 14.6f, 4f, 181.3f, 177.4f)
+                arc(18.2f, 17f, 2.5f, 274.6f, 175.4f)
+                // sun peeking out from behind it
+                arc(10f, 9.8f, 3.2f, 120f, 210f)
+                line(5f, 9.8f, 3.8f, 9.8f)
+                line(6.5f, 6.3f, 5.6f, 5.4f)
+                line(10f, 4.8f, 10f, 3.6f)
+                line(13.5f, 6.3f, 14.4f, 5.4f)
+                line(6.5f, 13.3f, 5.6f, 14.2f)
             },
             "com.sec.android.daemonapp", "com.google.android.apps.weather",
         ),

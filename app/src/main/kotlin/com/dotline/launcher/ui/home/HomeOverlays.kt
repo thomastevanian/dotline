@@ -27,6 +27,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
@@ -43,6 +45,7 @@ import com.dotline.launcher.AppGraph
 import com.dotline.launcher.core.CrashLog
 import com.dotline.launcher.data.AppShortcut
 import com.dotline.launcher.data.CalendarRepository
+import com.dotline.launcher.data.IconShape
 import com.dotline.launcher.data.LayoutEngine
 import com.dotline.launcher.data.WidgetProviderEntry
 import com.dotline.launcher.data.model.BuiltinWidget
@@ -233,6 +236,28 @@ private fun dockSlotRect(dock: FRect, slot: Int): FRect {
     return FRect(dock.left + slot * w, dock.top, dock.left + (slot + 1) * w, dock.bottom)
 }
 
+/** An outline in the shape of an icon tile (a circle, or a rounded square with the 28 percent corner). */
+private fun DrawScope.drawTileOutline(
+    cx: Float,
+    cy: Float,
+    size: Float,
+    rounded: Boolean,
+    color: Color,
+    strokeWidth: Float,
+) {
+    if (rounded) {
+        drawRoundRect(
+            color = color,
+            topLeft = Offset(cx - size / 2f, cy - size / 2f),
+            size = Size(size, size),
+            cornerRadius = CornerRadius(size * 0.28f),
+            style = Stroke(width = strokeWidth),
+        )
+    } else {
+        drawCircle(color = color, radius = size / 2f, center = Offset(cx, cy), style = Stroke(width = strokeWidth))
+    }
+}
+
 /**
  * Where the dragged item would land: a 2 dp white ring around the app or folder it is hovering
  * (drop = make or join a folder), or a 1 dp outline of the destination cell. Recomposes only when
@@ -252,8 +277,18 @@ internal fun DragHints(env: HomeEnv, layout: HomeLayout, cols: Int, rows: Int, t
     } else {
         0f
     }
+    val rounded = settings.iconShape == IconShape.ROUNDED_SQUARE
+    val ignoreId = env.slices.dragVisual?.info?.itemId
+    // A cell that is taken (so the drop would be refused) is outlined much fainter.
+    val cellFree = remember(target, layout, ignoreId) {
+        if (target is DropTarget.Cell) {
+            LayoutEngine.isFree(layout.pages.getOrNull(target.page).orEmpty(), target.placement, ignoreId)
+        } else {
+            true
+        }
+    }
     val ringColor = colors.primary
-    val outlineColor = colors.primary.copy(alpha = 0.6f)
+    val outlineColor = colors.primary.copy(alpha = if (cellFree) 0.6f else 0.2f)
 
     Canvas(Modifier.fillMaxSize()) {
         val cm = metrics.cellMetrics(cols, rows)
@@ -283,12 +318,7 @@ internal fun DragHints(env: HomeEnv, layout: HomeLayout, cols: Int, rows: Int, t
                     } else {
                         HomeLayoutMath.tileCenterY(rect.top, rect.height, tilePx, labelBlockPx)
                     }
-                    drawCircle(
-                        color = ringColor,
-                        radius = tilePx / 2f + 6.dp.toPx(),
-                        center = Offset(cx, cy),
-                        style = Stroke(width = 2.dp.toPx()),
-                    )
+                    drawTileOutline(cx, cy, tilePx + 12.dp.toPx(), rounded, ringColor, 2.dp.toPx())
                 }
             }
             is DropTarget.Cell -> {
@@ -296,14 +326,13 @@ internal fun DragHints(env: HomeEnv, layout: HomeLayout, cols: Int, rows: Int, t
                     val p = target.placement
                     val rect = cellRect(p.col, p.row, p.spanX, p.spanY, cm, area)
                     if (p.spanX == 1 && p.spanY == 1) {
-                        drawCircle(
+                        drawTileOutline(
+                            cx = (rect.left + rect.right) / 2f,
+                            cy = HomeLayoutMath.tileCenterY(rect.top, rect.height, tilePx, labelBlockPx),
+                            size = tilePx,
+                            rounded = rounded,
                             color = outlineColor,
-                            radius = tilePx / 2f,
-                            center = Offset(
-                                (rect.left + rect.right) / 2f,
-                                HomeLayoutMath.tileCenterY(rect.top, rect.height, tilePx, labelBlockPx),
-                            ),
-                            style = Stroke(width = 1.dp.toPx()),
+                            strokeWidth = 1.dp.toPx(),
                         )
                     } else {
                         val inset = HomeDims.WidgetInset.toPx()
@@ -320,11 +349,13 @@ internal fun DragHints(env: HomeEnv, layout: HomeLayout, cols: Int, rows: Int, t
             is DropTarget.Dock -> {
                 if (dock != null) {
                     val rect = dockSlotRect(dock, target.slot)
-                    drawCircle(
+                    drawTileOutline(
+                        cx = (rect.left + rect.right) / 2f,
+                        cy = (rect.top + rect.bottom) / 2f,
+                        size = tilePx,
+                        rounded = rounded,
                         color = outlineColor,
-                        radius = tilePx / 2f,
-                        center = Offset((rect.left + rect.right) / 2f, (rect.top + rect.bottom) / 2f),
-                        style = Stroke(width = 1.dp.toPx()),
+                        strokeWidth = 1.dp.toPx(),
                     )
                 }
             }
