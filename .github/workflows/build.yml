@@ -100,7 +100,18 @@ jobs:
 
           Every build is signed with the same key, so you can install any newer APK over the previous one.
           NOTES
-          gh release create "$TAG" dist/Dotline.apk dist/Dotline-fallback-debug.apk \
-            --target "$GITHUB_SHA" \
-            --title "Dotline $TAG" \
-            --notes-file release-notes.md
+          for attempt in 1 2 3; do
+            if gh release create "$TAG" dist/Dotline.apk dist/Dotline-fallback-debug.apk \
+                 --target "$GITHUB_SHA" \
+                 --title "Dotline $TAG" \
+                 --notes-file release-notes.md; then
+              exit 0
+            fi
+            echo "::warning::gh release create failed (attempt $attempt of 3)"
+            # a half-created release from a failed attempt would block the retry
+            gh release view "$TAG" >/dev/null 2>&1 && { echo "release $TAG exists now"; exit 0; }
+            sleep $((attempt * 15))
+          done
+          echo "::error::Could not publish the release. Token permissions and rate limit follow."
+          gh api rate_limit --jq '.resources.core' || true
+          exit 1
