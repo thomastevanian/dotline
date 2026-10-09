@@ -1,0 +1,150 @@
+name: Build Dotline
+
+on:
+  push:
+    branches: [main, "claude/**"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Gradle (with cache)
+        uses: gradle/actions/setup-gradle@v6
+        with:
+          cache-read-only: false
+          add-job-summary: never
+
+      - name: Ensure Android SDK packages
+        run: |
+          set +e
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null 2>&1
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-37.0" "build-tools;36.0.0" 2>&1 | tail -5
+          ls "$ANDROID_HOME/platforms" "$ANDROID_HOME/build-tools"
+          exit 0
+
+      - name: Unit tests (non-blocking)
+        continue-on-error: true
+        run: ./gradlew --console=plain testDebugUnitTest 2>&1 | tee test.log
+
+      - name: Unit test summary
+        if: always()
+        run: |
+          python3 - <<'PY'
+          import glob, re
+          total = fail = 0
+          for f in glob.glob('app/build/test-results/**/*.xml', recursive=True):
+              m = re.search(r'tests="(\d+)" skipped="\d+" failures="(\d+)" errors="(\d+)"', open(f, encoding='utf8').read())
+              if m:
+                  total += int(m.group(1)); fail += int(m.group(2)) + int(m.group(3))
+          line = f"{total} run, {fail} failed"
+          print(f"=== UNIT TESTS: {line} ===")
+          open("test-summary.txt", "w").write(line)
+          PY
+
+      - name: Build (release + debug fallback)
+        run: ./gradlew --console=plain assembleRelease assembleDebug 2>&1 | tee build.log; test ${PIPESTATUS[0]} -eq 0
+
+      - name: Compact error summary
+        if: failure()
+        run: |
+          {
+            echo "run ${{ github.run_number }} on ${GITHUB_SHA::7} (${GITHUB_REF_NAME})"
+            grep -h -E "^e: |error:|AAPT|Execution failed|What went wrong|> .*(not found|Could not)|FAILED|AssertionError" build.log test.log 2>/dev/null \
+              | sed -E 's#file:///home/runner/work/dotline/dotline/app/src/(main|test)/(kotlin/com/dotline/launcher/)?##' | sort -u | head -200
+          } > errors.txt
+          echo "=== COMPILER / BUILD ERRORS (compact) ==="
+          cat errors.txt
+          echo "=== END ERRORS ==="
+
+      # The job log is long and noisy, so the result of every run (and the compact error summary
+      # when it failed) is also pushed to a tiny branch ("ci-logs") that can be read cheaply.
+      - name: Publish build status to ci-logs
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set +e
+          {
+            echo "run ${{ github.run_number }} sha ${GITHUB_SHA::7} result ${{ job.status }}"
+            echo "tests: $(cat test-summary.txt 2>/dev/null)"
+            grep -h "FAILED" test.log 2>/dev/null | sort -u | head -30
+            [ -f errors.txt ] && cat errors.txt
+          } > /tmp/status.txt
+          rm -rf /tmp/cilogs && mkdir /tmp/cilogs && cd /tmp/cilogs || exit 0
+          git init -q
+          git remote add origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          if git fetch -q --depth=1 origin ci-logs 2>/dev/null; then
+            git checkout -q -b ci-logs FETCH_HEAD
+          else
+            git checkout -q --orphan ci-logs
+          fi
+          cp /tmp/status.txt "status-${GITHUB_REF_NAME//\//_}.txt"
+          git add -A
+          git -c user.name=github-actions -c user.email=actions@github.com commit -q -m "status of run ${{ github.run_number }}"
+          git push -q origin ci-logs 2>&1 | tail -2
+          exit 0
+
+      - name: Collect APKs
+        if: ${{ success() && !startsWith(github.event.head_commit.message, 'WIP') }}
+        run: |
+          mkdir -p dist
+          REL=$(ls app/build/outputs/apk/release/*.apk | head -n1)
+          DBG=$(ls app/build/outputs/apk/debug/*.apk | head -n1)
+          cp "$REL" dist/Dotline.apk
+          cp "$DBG" dist/Dotline-fallback-debug.apk
+          ls -la dist
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --print-certs dist/Dotline.apk | head -5
+
+      - name: Upload APK artifacts
+        if: ${{ success() && !startsWith(github.event.head_commit.message, 'WIP') }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: Dotline-apk
+          path: dist/*.apk
+          if-no-files-found: error
+
+      - name: Publish GitHub Release
+        if: ${{ success() && !startsWith(github.event.head_commit.message, 'WIP') }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="v1.0.${{ github.run_number }}"
+          cat > release-notes.md <<NOTES
+          **Dotline ${TAG}** — built from commit \`${GITHUB_SHA::7}\` on \`${GITHUB_REF_NAME}\`.
+
+          - **Dotline.apk** — the app (install this one).
+          - **Dotline-fallback-debug.apk** — same app without code shrinking. Only use it if Dotline.apk crashes on launch. Same signature, so it installs over the top without uninstalling.
+
+          Unit tests: $(cat test-summary.txt 2>/dev/null || echo "not run").
+
+          Every build is signed with the same key, so you can install any newer APK over the previous one.
+          NOTES
+          for attempt in 1 2 3; do
+            if gh release create "$TAG" dist/Dotline.apk dist/Dotline-fallback-debug.apk \
+                 --target "$GITHUB_SHA" \
+                 --title "Dotline $TAG" \
+                 --notes-file release-notes.md; then
+              exit 0
+            fi
+            echo "::warning::gh release create failed (attempt $attempt of 3)"
+            # a half-created release from a failed attempt would block the retry
+            gh release view "$TAG" >/dev/null 2>&1 && { echo "release $TAG exists now"; exit 0; }
+            sleep $((attempt * 15))
+          done
+          echo "::error::Could not publish the release. Token permissions and rate limit follow."
+          gh api rate_limit --jq '.resources.core' || true
+          exit 1

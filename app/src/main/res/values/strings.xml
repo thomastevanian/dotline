@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Dotline</string>
+    <string name="widget_clock_desc">Dot-matrix clock</string>
+    <string name="widget_date_desc">Weekday and date in dot-matrix type</string>
+    <string name="widget_battery_desc">Battery level as a ring of dots</string>
+    <string name="widget_weather_desc">Temperature and condition from Dotline\'s cached weather</string>
+    <string name="lock_service_desc">Only used to lock the screen when you double-tap the Dotline home screen. It does not read or record anything on your screen.</string>
+    <string name="notification_listener_label">Dotline notification dots</string>
+    <string name="lock_service_label">Dotline double-tap to lock</string>
+</resources>
