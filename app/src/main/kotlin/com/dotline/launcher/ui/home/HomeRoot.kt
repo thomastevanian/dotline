@@ -434,10 +434,14 @@ fun HomeRoot(
             when (event) {
                 Lifecycle.Event.ON_START -> {
                     graph.weather.refreshIfStale()
-                    try {
-                        WidgetSupport.refreshDataWidgets(context)
-                    } catch (e: Exception) {
-                        CrashLog.record("home: refresh data widgets", e)
+                    // Pushing fresh data into the launcher's own app widgets is binder work: keep it off the main thread.
+                    val appContext = context.applicationContext
+                    graph.scope.launch {
+                        try {
+                            WidgetSupport.refreshDataWidgets(appContext)
+                        } catch (e: Exception) {
+                            CrashLog.record("home: refresh data widgets", e)
+                        }
                     }
                     graph.widgetHost.start()
                 }
