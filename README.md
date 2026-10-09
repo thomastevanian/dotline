@@ -25,9 +25,17 @@ location.
 | Widgets for any launcher | Real app widgets (dot clock, date, battery, weather) that also work in One UI |
 | Settings | Nothing-style settings, backup and restore of your whole layout and settings as a JSON file, crash log screen, "Finish the look" guide |
 
+## Status
+
+Every push is compiled, shrunk with R8, signed and unit-tested by GitHub Actions (230 unit tests cover the layout
+engine, drag and drop rules, gestures, drawer search, weather parsing, backup, wallpaper generation and sound
+synthesis). The screens themselves have been built from reference screenshots of Nothing OS 5.0 but have not yet been
+checked on every phone, so if something looks off or crashes, open **Settings > About > Crash log** and send what it
+shows.
+
 ## Install on your phone
 
-1. On the phone, open this repository's **Releases** page in the browser and open the newest release.
+1. On the phone, open the **[Releases page](https://github.com/thomastevanian/dotline/releases)** in the browser and open the newest release.
 2. Download **`Dotline.apk`** (the other file, `Dotline-fallback-debug.apk`, is only for the rare case that the
    main one crashes on launch).
 3. Open the downloaded file. Android will ask to allow installs from your browser or Files app
