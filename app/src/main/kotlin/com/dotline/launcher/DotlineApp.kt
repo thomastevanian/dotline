@@ -11,5 +11,11 @@ class DotlineApp : Application() {
         super.onCreate()
         CrashLog.install(this)
         graph = AppGraph(this)
+        graph.start()
+    }
+
+    override fun onTrimMemory(level: Int) {
+        super.onTrimMemory(level)
+        if (::graph.isInitialized) graph.onTrimMemory(level)
     }
 }

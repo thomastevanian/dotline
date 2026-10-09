@@ -64,6 +64,14 @@ android {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
     }
+
+    testOptions {
+        unitTests.isReturnDefaultValues = true
+    }
+}
+
+tasks.withType<Test>().configureEach {
+    useJUnitPlatform()
 }
 
 kotlin {
@@ -96,4 +104,10 @@ dependencies {
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.datastore.preferences)
     implementation(libs.androidx.biometric)
+
+    testImplementation(libs.kotlin.test.junit5)
+    testImplementation(libs.junit.jupiter)
+    testRuntimeOnly(libs.junit.platform.launcher)
+    // Real org.json for JVM unit tests (the android.jar one is a throwing stub).
+    testImplementation(libs.org.json)
 }

@@ -35,6 +35,10 @@ jobs:
           ls "$ANDROID_HOME/platforms" "$ANDROID_HOME/build-tools"
           exit 0
 
+      - name: Unit tests (non-blocking)
+        continue-on-error: true
+        run: ./gradlew --stacktrace testDebugUnitTest
+
       - name: Build (release + debug fallback)
         run: ./gradlew --stacktrace assembleRelease assembleDebug
 
