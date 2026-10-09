@@ -5,6 +5,7 @@ import android.content.Context
 import com.dotline.launcher.data.AppRepository
 import com.dotline.launcher.data.LayoutRepository
 import com.dotline.launcher.data.NotesRepository
+import com.dotline.launcher.data.WidgetHostManager
 import com.dotline.launcher.data.SettingsRepository
 import com.dotline.launcher.data.icons.IconRepository
 import com.dotline.launcher.data.weather.WeatherRepository
@@ -30,6 +31,7 @@ class AppGraph(val app: Application) {
     val notes = NotesRepository(app, scope)
     val recents = RecentAppsRepository(app, scope)
     val wallpapers = WallpaperStore(app, scope)
+    val widgetHost = WidgetHostManager(app)
 
     /** Emits whenever the Home button is pressed while Dotline is already the foreground launcher. */
     val homePressed = MutableSharedFlow<Unit>(extraBufferCapacity = 1, onBufferOverflow = BufferOverflow.DROP_OLDEST)

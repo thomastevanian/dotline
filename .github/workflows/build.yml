@@ -61,10 +61,37 @@ jobs:
       - name: Compact error summary
         if: failure()
         run: |
+          {
+            echo "run ${{ github.run_number }} on ${GITHUB_SHA::7} (${GITHUB_REF_NAME})"
+            grep -h -E "^e: |error:|AAPT|Execution failed|What went wrong|> .*(not found|Could not)|FAILED|AssertionError" build.log test.log 2>/dev/null \
+              | sed -E 's#file:///home/runner/work/dotline/dotline/app/src/(main|test)/(kotlin/com/dotline/launcher/)?##' | sort -u | head -200
+          } > errors.txt
           echo "=== COMPILER / BUILD ERRORS (compact) ==="
-          grep -h -E "^e: |^w: .*(error|unresolved)|error:|AAPT|Execution failed|What went wrong|> .*(not found|Could not)" build.log test.log 2>/dev/null \
-            | sed -E 's#file:///home/runner/work/dotline/dotline/app/src/main/(kotlin/com/dotline/launcher/)?##' | sort -u | head -150
+          cat errors.txt
           echo "=== END ERRORS ==="
+
+      # The job log is long and noisy, so the same summary is also pushed to a tiny
+      # branch ("ci-logs") that can be read with one cheap file request.
+      - name: Publish error summary to ci-logs
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set +e
+          cp errors.txt /tmp/errors.txt
+          rm -rf /tmp/cilogs && mkdir /tmp/cilogs && cd /tmp/cilogs || exit 0
+          git init -q
+          git remote add origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          if git fetch -q --depth=1 origin ci-logs 2>/dev/null; then
+            git checkout -q -b ci-logs FETCH_HEAD
+          else
+            git checkout -q --orphan ci-logs
+          fi
+          cp /tmp/errors.txt "errors-${GITHUB_REF_NAME//\//_}.txt"
+          git add -A
+          git -c user.name=github-actions -c user.email=actions@github.com commit -q -m "errors for run ${{ github.run_number }}" 
+          git push -q origin ci-logs 2>&1 | tail -2
+          exit 0
 
       - name: Collect APKs
         if: ${{ success() && !startsWith(github.event.head_commit.message, 'WIP') }}

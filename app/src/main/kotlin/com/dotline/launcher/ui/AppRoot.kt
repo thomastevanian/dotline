@@ -7,6 +7,7 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -23,13 +24,16 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.dotline.launcher.data.ThemeMode
 import com.dotline.launcher.graph
 import com.dotline.launcher.ui.crash.CrashLogScreen
-import com.dotline.launcher.ui.home.HomeScreen
+import com.dotline.launcher.ui.guide.SetupGuideScreen
+import com.dotline.launcher.ui.home.HomeRoot
 import com.dotline.launcher.ui.onboarding.OnboardingScreen
 import com.dotline.launcher.ui.settings.SettingsScreen
+import com.dotline.launcher.ui.sound.SoundStudioScreen
 import com.dotline.launcher.ui.theme.DotlineTheme
+import com.dotline.launcher.ui.wallpaper.WallpaperStudioScreen
 
 /** Top-level screens. The stack is stored as a comma separated string so it survives process death. */
-private enum class Screen { HOME, SETTINGS, CRASH_LOG }
+private enum class Screen { HOME, SETTINGS, CRASH_LOG, WALLPAPER, SOUND, GUIDE }
 
 @Composable
 fun AppRoot() {
@@ -71,18 +75,30 @@ private fun Navigator() {
     fun push(s: Screen) { stack = (screens + s).joinToString(",") { it.name } }
     fun pop() { if (screens.size > 1) stack = screens.dropLast(1).joinToString(",") { it.name } }
 
+    // The Home button always goes back to the home screen, whatever is open on top of it.
+    val graph = LocalContext.current.graph
+    LaunchedEffect(graph) {
+        graph.homePressed.collect { stack = Screen.HOME.name }
+    }
+
     // Home stays composed underneath so its state (page, scroll) is kept.
-    HomeScreen(
+    HomeRoot(
         onOpenSettings = { push(Screen.SETTINGS) },
-        onOpenCrashLog = { push(Screen.CRASH_LOG) },
+        onOpenWallpaperStudio = { push(Screen.WALLPAPER) },
     )
     when (current) {
         Screen.HOME -> Unit
         Screen.SETTINGS -> SettingsScreen(
             onBack = { pop() },
             onOpenCrashLog = { push(Screen.CRASH_LOG) },
+            onOpenWallpaperStudio = { push(Screen.WALLPAPER) },
+            onOpenSoundStudio = { push(Screen.SOUND) },
+            onOpenSetupGuide = { push(Screen.GUIDE) },
         )
         Screen.CRASH_LOG -> CrashLogScreen(onBack = { pop() })
+        Screen.WALLPAPER -> WallpaperStudioScreen(onBack = { pop() })
+        Screen.SOUND -> SoundStudioScreen(onBack = { pop() })
+        Screen.GUIDE -> SetupGuideScreen(onBack = { pop() })
     }
 }
 
