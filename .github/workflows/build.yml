@@ -66,6 +66,7 @@ jobs:
           echo "=== END ERRORS ==="
 
       - name: Collect APKs
+        if: ${{ success() && !startsWith(github.event.head_commit.message, 'WIP') }}
         run: |
           mkdir -p dist
           REL=$(ls app/build/outputs/apk/release/*.apk | head -n1)
@@ -76,6 +77,7 @@ jobs:
           "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --print-certs dist/Dotline.apk | head -5
 
       - name: Upload APK artifacts
+        if: ${{ success() && !startsWith(github.event.head_commit.message, 'WIP') }}
         uses: actions/upload-artifact@v7
         with:
           name: Dotline-apk
@@ -83,6 +85,7 @@ jobs:
           if-no-files-found: error
 
       - name: Publish GitHub Release
+        if: ${{ success() && !startsWith(github.event.head_commit.message, 'WIP') }}
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
