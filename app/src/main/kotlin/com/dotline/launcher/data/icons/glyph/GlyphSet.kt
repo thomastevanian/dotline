@@ -2,11 +2,12 @@ package com.dotline.launcher.data.icons.glyph
 
 /**
  * All built-in glyphs, matched by package name. Each category lives in its own file
- * (GlyphsSystem, GlyphsGoogle, GlyphsSocial, GlyphsMedia, GlyphsSamsung) so they can be edited independently.
+ * (GlyphsSystem, GlyphsGoogle, GlyphsSocial, GlyphsMedia, GlyphsSamsung, GlyphsOffice) so they can be edited independently.
  */
 object GlyphSet {
     val entries: List<GlyphEntry> by lazy {
-        GlyphsSystem.entries + GlyphsGoogle.entries + GlyphsSocial.entries + GlyphsMedia.entries + GlyphsSamsung.entries
+        GlyphsSystem.entries + GlyphsGoogle.entries + GlyphsSocial.entries + GlyphsMedia.entries +
+            GlyphsSamsung.entries + GlyphsOffice.entries
     }
 
     private val byPackage: Map<String, Glyph> by lazy {
