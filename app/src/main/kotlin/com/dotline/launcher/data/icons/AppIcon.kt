@@ -16,6 +16,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.dotline.launcher.data.IconShape
 import com.dotline.launcher.data.model.AppInfo
 import com.dotline.launcher.ui.LocalAppGraph
 import com.dotline.launcher.ui.LocalSettings
@@ -96,6 +97,13 @@ fun AppIconView(
     val icon = rememberAppIcon(app, request).value
     val dotColor = DotlineTheme.colors.accent
     val dotSize = (sizeDp.value * 0.16f).coerceIn(6f, 10f).dp
+    // On a circular tile the square's corner floats clear of the circle; pull the dot in so its centre
+    // sits on the circle edge at 45 degrees (0.1464 * size from each side). A rounded square needs none.
+    val dotInset: Dp = if (settings.iconShape == IconShape.CIRCLE) {
+        (sizeDp.value * 0.1464f - dotSize.value / 2f).coerceAtLeast(0f).dp
+    } else {
+        0.dp
+    }
     val baseStyle = DotlineTheme.type.iconLabel
     val labelStyle = remember(baseStyle, labelColor) {
         baseStyle.copy(color = labelColor, textAlign = TextAlign.Center)
@@ -117,6 +125,7 @@ fun AppIconView(
                 Box(
                     modifier = Modifier
                         .align(Alignment.TopEnd)
+                        .offset(x = -dotInset, y = dotInset)
                         .size(dotSize)
                         .background(dotColor, CircleShape),
                 )

@@ -22,6 +22,8 @@ data class Settings(
     val gridRows: Int = 6,
     val infiniteScroll: Boolean = false,
     val showDock: Boolean = true,
+    /** The "Search" pill under the dock (opens the drawer with the keyboard), as on Nothing OS. */
+    val showSearchBar: Boolean = true,
     val lockLayout: Boolean = false,
     /** 0f..0.6f black scrim over the wallpaper for legibility. */
     val wallpaperDim: Float = 0f,
@@ -80,6 +82,7 @@ object SettingsJson {
         put("gridRows", s.gridRows)
         put("infiniteScroll", s.infiniteScroll)
         put("showDock", s.showDock)
+        put("showSearchBar", s.showSearchBar)
         put("lockLayout", s.lockLayout)
         put("wallpaperDim", s.wallpaperDim.toDouble())
         put("iconStyle", s.iconStyle.name)
@@ -122,6 +125,7 @@ object SettingsJson {
             gridRows = o.optInt("gridRows", d.gridRows).coerceIn(5, 7),
             infiniteScroll = o.optBoolean("infiniteScroll", d.infiniteScroll),
             showDock = o.optBoolean("showDock", d.showDock),
+            showSearchBar = o.optBoolean("showSearchBar", d.showSearchBar),
             lockLayout = o.optBoolean("lockLayout", d.lockLayout),
             wallpaperDim = o.optDouble("wallpaperDim", d.wallpaperDim.toDouble()).toFloat().coerceIn(0f, 0.6f),
             iconStyle = o.enum("iconStyle", d.iconStyle),

@@ -311,6 +311,8 @@ class IconRepository(
             }
         } catch (e: Exception) {
             null
+        } catch (e: OutOfMemoryError) {
+            null
         }
     }
 

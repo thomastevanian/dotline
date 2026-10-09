@@ -20,6 +20,14 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
+/** What the home controller needs from the layout storage (the real one is [LayoutRepository]). */
+interface LayoutStore {
+    val layout: StateFlow<HomeLayout>
+
+    /** Applies [transform]; returning null (impossible edit) leaves the layout unchanged. Runs synchronously. */
+    fun update(transform: (HomeLayout) -> HomeLayout?)
+}
+
 /** Short unique ids for home items. */
 object LayoutIds {
     fun newId(): String = "i" + UUID.randomUUID().toString().replace("-", "").take(10)
@@ -37,11 +45,11 @@ class LayoutRepository(
     private val scope: CoroutineScope,
     private val apps: AppRepository,
     private val settings: SettingsRepository,
-) {
+) : LayoutStore {
     private val appContext = context.applicationContext
     private val file = File(appContext.filesDir, "layout.json")
     private val _layout = MutableStateFlow(HomeLayout())
-    val layout: StateFlow<HomeLayout> = _layout.asStateFlow()
+    override val layout: StateFlow<HomeLayout> = _layout.asStateFlow()
     private val _ready = MutableStateFlow(false)
     val ready: StateFlow<Boolean> = _ready.asStateFlow()
 
@@ -84,11 +92,13 @@ class LayoutRepository(
     }
 
     /** Applies [transform]; returning null (impossible edit) leaves the layout unchanged. */
-    fun update(transform: (HomeLayout) -> HomeLayout?) {
+    override fun update(transform: (HomeLayout) -> HomeLayout?) {
         synchronized(this) {
             val s = settings.settings.value
             val next = transform(_layout.value) ?: return
-            val fitted = LayoutEngine.normalize(next, s.gridColumns, s.gridRows)
+            // Empty trailing pages are kept while editing (a dragged item may land on a fresh page);
+            // HomeController trims them when the edit ends.
+            val fitted = LayoutEngine.normalize(next, s.gridColumns, s.gridRows, trim = false)
             if (fitted == _layout.value) return
             _layout.value = fitted
         }

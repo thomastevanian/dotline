@@ -192,4 +192,34 @@ class LayoutEngineTest {
         assertEquals(GestureAction.EDIT_MODE, wild.swipeUp)
         assertTrue(wild.weatherLat.isNaN())
     }
+
+    @Test
+    fun newItemsFromTheDrawer() {
+        val layout = HomeLayout(listOf(listOf(app("a", 0, 0), app("b", 1, 0))))
+        val fresh = app("n", 0, 0)
+        assertNull(LayoutEngine.placeNew(layout, fresh, 0, Placement(1, 0), cols, rows), "occupied")
+        assertNull(LayoutEngine.placeNew(layout, fresh, 1, Placement(0, 0), cols, rows), "no such page")
+        assertNull(LayoutEngine.placeNew(layout, fresh, 0, Placement(5, 0), cols, rows), "outside grid")
+        val placed = assertNotNull(LayoutEngine.placeNew(layout, fresh, 0, Placement(3, 3), cols, rows))
+        assertEquals(Placement(3, 3), LayoutEngine.findItem(placed, "id_n")!!.placement)
+
+        val docked = assertNotNull(LayoutEngine.placeNewInDock(layout, fresh, 2))
+        assertEquals(LayoutEngine.DOCK, LayoutEngine.locate(docked, "id_n"))
+        assertNull(LayoutEngine.placeNewInDock(docked, app("m", 0, 0), 2))
+        val wide = WidgetItem("w", BuiltinWidget.CLOCK, Placement(0, 0, 4, 2))
+        assertNull(LayoutEngine.placeNewInDock(layout, wide, 0))
+    }
+
+    @Test
+    fun newAppDroppedOnAppOrFolder() {
+        val layout = HomeLayout(listOf(listOf(app("a", 0, 0), FolderItem("f", "F", listOf(key("x"), key("y")), Placement(1, 0)))))
+        val folder = assertNotNull(LayoutEngine.createFolderWith(layout, "id_a", key("n"), "Folder", "f2"))
+        assertEquals(listOf(key("a"), key("n")), (LayoutEngine.findItem(folder, "f2") as FolderItem).apps)
+        assertNull(LayoutEngine.createFolderWith(layout, "id_a", key("a"), "Folder", "f3"), "same app")
+        assertNull(LayoutEngine.createFolderWith(layout, "f", key("n"), "Folder", "f3"), "target is a folder")
+
+        val joined = assertNotNull(LayoutEngine.addAppToFolder(layout, "f", key("n")))
+        assertEquals(3, (LayoutEngine.findItem(joined, "f") as FolderItem).apps.size)
+        assertNull(LayoutEngine.addAppToFolder(layout, "f", key("x")), "already inside")
+    }
 }

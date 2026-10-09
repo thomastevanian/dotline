@@ -83,6 +83,39 @@ object LayoutEngine {
         return layout.copy(pages = layout.pages + listOf(listOf(item.withPlacement(spot))))
     }
 
+    /**
+     * Places a NEW item (not yet on the home screen, e.g. dragged out of the drawer or a widget picker)
+     * at [target] on [page]. Null when the spot is blocked or outside the grid.
+     */
+    fun placeNew(layout: HomeLayout, item: HomeItem, page: Int, target: Placement, cols: Int, rows: Int): HomeLayout? {
+        if (page !in layout.pages.indices) return null
+        val placement = target.copy(spanX = item.placement.spanX, spanY = item.placement.spanY)
+        if (!fits(placement, cols, rows) || !isFree(layout.pages[page], placement)) return null
+        return withPage(layout, page, layout.pages[page] + item.withPlacement(placement))
+    }
+
+    /** Places a new app or folder into dock [slot]. Null when the slot is taken or the item cannot be docked. */
+    fun placeNewInDock(layout: HomeLayout, item: HomeItem, slot: Int): HomeLayout? {
+        if (slot !in 0 until HomeLayout.DOCK_SLOTS) return null
+        if (item !is AppItem && item !is FolderItem) return null
+        if (layout.dock.any { it.placement.col == slot }) return null
+        return layout.copy(dock = layout.dock + item.withPlacement(Placement(slot, 0)))
+    }
+
+    /** A new app (not yet placed) dropped on app [targetId]: makes a folder with both. */
+    fun createFolderWith(layout: HomeLayout, targetId: String, newApp: AppKey, name: String, newId: String): HomeLayout? {
+        val target = findItem(layout, targetId) as? AppItem ?: return null
+        if (target.app == newApp) return null
+        return replaceItem(layout, targetId, FolderItem(newId, name, listOf(target.app, newApp), target.placement))
+    }
+
+    /** A new app (not yet placed) dropped on folder [folderId]. Null when full or already inside. */
+    fun addAppToFolder(layout: HomeLayout, folderId: String, app: AppKey): HomeLayout? {
+        val folder = findItem(layout, folderId) as? FolderItem ?: return null
+        if (folder.apps.size >= MAX_FOLDER_APPS || app in folder.apps) return null
+        return replaceItem(layout, folderId, folder.copy(apps = folder.apps + app))
+    }
+
     // ---- moving ----------------------------------------------------------------------------
 
     /** Moves [id] to [target] on [page]. Null when the target is blocked or out of the grid. */
@@ -176,6 +209,17 @@ object LayoutEngine {
         }
     }
 
+    /**
+     * Takes [app] out of folder [folderId] WITHOUT placing it anywhere (the caller places it).
+     * A folder left with 0 or 1 apps dissolves. Null when the folder or app is not found.
+     */
+    fun takeFromFolder(layout: HomeLayout, folderId: String, app: AppKey): HomeLayout? {
+        val folder = findItem(layout, folderId) as? FolderItem ?: return null
+        if (app !in folder.apps) return null
+        val dissolved = dissolveIfSmall(folder.copy(apps = folder.apps.filterNot { it == app }))
+        return if (dissolved == null) removeItem(layout, folderId) else replaceItem(layout, folderId, dissolved)
+    }
+
     fun renameFolder(layout: HomeLayout, folderId: String, name: String): HomeLayout {
         val folder = findItem(layout, folderId) as? FolderItem ?: return layout
         return replaceItem(layout, folderId, folder.copy(name = name))
@@ -207,7 +251,7 @@ object LayoutEngine {
      * items to the first free spot (adding pages up to the limit), then trims empty pages.
      * Items that cannot be placed anywhere are dropped.
      */
-    fun normalize(layout: HomeLayout, cols: Int, rows: Int): HomeLayout {
+    fun normalize(layout: HomeLayout, cols: Int, rows: Int, trim: Boolean = true): HomeLayout {
         val keptPages = ArrayList<List<HomeItem>>()
         val overflow = ArrayList<HomeItem>()
 
@@ -255,7 +299,7 @@ object LayoutEngine {
         for (item in overflow) {
             result = addToFirstFree(result, item, cols, rows) ?: result
         }
-        return trimPages(result)
+        return if (trim) trimPages(result) else result
     }
 
     // ---- helpers ---------------------------------------------------------------------------

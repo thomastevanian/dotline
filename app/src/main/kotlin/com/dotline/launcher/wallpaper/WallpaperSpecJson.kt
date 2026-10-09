@@ -13,10 +13,11 @@ object WallpaperSpecJson {
     const val MAX_TEXT = 40
 
     fun encode(spec: WallpaperSpec): JSONObject {
+        val d = WallpaperSpec()
         val o = JSONObject()
         o.put("pattern", spec.pattern.name)
-        o.put("spacing", spec.spacing.toDouble())
-        o.put("dotSize", spec.dotSize.toDouble())
+        o.put("spacing", finiteOr(spec.spacing, d.spacing).toDouble())
+        o.put("dotSize", finiteOr(spec.dotSize, d.dotSize).toDouble())
         o.put("color", spec.color)
         o.put("background", spec.background)
         o.put("seed", spec.seed)
@@ -52,6 +53,11 @@ object WallpaperSpecJson {
         } catch (e: Exception) {
             null
         }
+    }
+
+    /** JSON cannot hold NaN or infinity (put would throw), so those become [fallback]. */
+    private fun finiteOr(value: Float, fallback: Float): Float {
+        return if (value.isNaN() || value.isInfinite()) fallback else value
     }
 
     private fun readPattern(o: JSONObject, fallback: WallpaperPattern): WallpaperPattern {

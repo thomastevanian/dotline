@@ -55,6 +55,12 @@ class DotlineColors(
     val iconTile: Color,
     val pressOverlay: Color,
     val scrim: Color,
+    /** Folder circle on the home screen: lighter than [iconTile] (Nothing OS look). */
+    val folderTile: Color,
+    /** Fill of home-screen widgets: cards, capsules and circles. */
+    val widget: Color,
+    /** Fill of the "Search" pill on the home screen and in the drawer. */
+    val searchPill: Color,
 )
 
 val DarkColors = DotlineColors(
@@ -69,9 +75,12 @@ val DarkColors = DotlineColors(
     highlight = Color(0xFFD4D4D4),
     onHighlight = Color(0xFF000000),
     accent = NothingRed,
-    iconTile = Color(0xFF000000),
+    iconTile = Color(0xFF141414),
     pressOverlay = Color(0x14FFFFFF),
     scrim = Color(0x99000000),
+    folderTile = Color(0xFF262626),
+    widget = Color(0xFF0F0F0F),
+    searchPill = Color(0xFF242424),
 )
 
 val LightColors = DotlineColors(
@@ -89,6 +98,9 @@ val LightColors = DotlineColors(
     iconTile = Color(0xFFFFFFFF),
     pressOverlay = Color(0x14000000),
     scrim = Color(0x66FFFFFF),
+    folderTile = Color(0xFFD0D0D0),
+    widget = Color(0xFFFFFFFF),
+    searchPill = Color(0xFFFFFFFF),
 )
 
 object DotlineFonts {

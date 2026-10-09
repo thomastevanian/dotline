@@ -39,6 +39,21 @@ jobs:
         continue-on-error: true
         run: ./gradlew --console=plain testDebugUnitTest 2>&1 | tee test.log
 
+      - name: Unit test summary
+        if: always()
+        run: |
+          python3 - <<'PY'
+          import glob, re
+          total = fail = 0
+          for f in glob.glob('app/build/test-results/**/*.xml', recursive=True):
+              m = re.search(r'tests="(\d+)" skipped="\d+" failures="(\d+)" errors="(\d+)"', open(f, encoding='utf8').read())
+              if m:
+                  total += int(m.group(1)); fail += int(m.group(2)) + int(m.group(3))
+          line = f"{total} run, {fail} failed"
+          print(f"=== UNIT TESTS: {line} ===")
+          open("test-summary.txt", "w").write(line)
+          PY
+
       - name: Build (release + debug fallback)
         run: ./gradlew --console=plain assembleRelease assembleDebug 2>&1 | tee build.log; test ${PIPESTATUS[0]} -eq 0
 
@@ -77,6 +92,8 @@ jobs:
 
           - **Dotline.apk** — the app (install this one).
           - **Dotline-fallback-debug.apk** — same app without code shrinking. Only use it if Dotline.apk crashes on launch. Same signature, so it installs over the top without uninstalling.
+
+          Unit tests: $(cat test-summary.txt 2>/dev/null || echo "not run").
 
           Every build is signed with the same key, so you can install any newer APK over the previous one.
           NOTES
