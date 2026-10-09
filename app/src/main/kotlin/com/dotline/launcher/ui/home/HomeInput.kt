@@ -29,9 +29,10 @@ import com.dotline.launcher.home.HomeController
 import com.dotline.launcher.home.HomeGeometry
 import com.dotline.launcher.home.HomeLayoutMath
 import com.dotline.launcher.home.HomeMenu
+import com.dotline.launcher.home.PointerSample
+import com.dotline.launcher.home.PointerSession
 import com.dotline.launcher.home.ScrollRequest
 import com.dotline.launcher.home.ZoneSet
-import kotlin.math.hypot
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.withTimeoutOrNull
 
@@ -72,6 +73,11 @@ internal class HomeGestureHost(
     var pointerX: Float = 0f
     var pointerY: Float = 0f
 
+    /** Follows the current touch sequence (engine mode, external drag, covered screen). */
+    val session = PointerSession(engine)
+
+    private val samples = ArrayList<PointerSample>(4)
+
     /** The item that was under the finger when the long press fired. */
     private var pressedItem: HitItem? = null
 
@@ -104,7 +110,28 @@ internal class HomeGestureHost(
     }
 
     /** True when a drag exists that this pointer handler's engine did not start (drawer, folder popup). */
-    fun hasForeignDrag(): Boolean = controller.ui.value.drag != null && !engine.isDragging
+    private fun hasForeignDrag(): Boolean = controller.ui.value.drag != null && !engine.isDragging
+
+    /** Handles one pointer event of the current touch sequence; returns true when the sequence is over. */
+    fun onEvent(event: PointerEvent): Boolean {
+        samples.clear()
+        for (c in event.changes) {
+            samples.add(PointerSample(c.id.value, c.position.x, c.position.y, c.pressed, c.uptimeMillis))
+        }
+        val result = session.onFrame(samples, hasForeignDrag())
+        // The finger position is kept fresh for drags that start inside a child (see beginFolderDrag).
+        pointerX = session.x
+        pointerY = session.y
+        val move = result.externalMove
+        if (move != null) externalMove(move.x, move.y)
+        val end = result.externalEnd
+        if (end != null) externalEnd(end.x, end.y)
+        apply(result.step, event)
+        if (result.consumeAll) {
+            for (c in event.changes) c.consume()
+        }
+        return result.done
+    }
 
     // ---- gesture life cycle -----------------------------------------------------------------
 
@@ -301,59 +328,30 @@ internal fun Modifier.homeGestures(host: HomeGestureHost): Modifier =
         }
     }
 
-/** Distance between the first two pressed pointers of an event, 0 when there are fewer than two. */
-private fun pointerDistance(changes: List<PointerInputChange>): Float {
-    var firstX = 0f
-    var firstY = 0f
-    var found = 0
-    for (c in changes) {
-        if (!c.pressed) continue
-        if (found == 0) {
-            firstX = c.position.x
-            firstY = c.position.y
-            found = 1
-        } else {
-            return hypot(c.position.x - firstX, c.position.y - firstY)
-        }
-    }
-    return 0f
-}
-
-private fun consumeAll(event: PointerEvent) {
-    for (c in event.changes) c.consume()
-}
-
 /**
- * Follows one touch sequence from the first finger down to the last finger up. Three modes:
- * the engine owns the gesture (normal), a drag that began elsewhere is carried by this finger
- * (external), or the home screen is covered and the sequence is only watched (disabled).
+ * Follows one touch sequence from the first finger down to the last finger up. All decisions are made
+ * by [PointerSession] and the engine behind it; this loop only waits for events (and for the long
+ * press timer) and hands them over.
  */
 private suspend fun AwaitPointerEventScope.trackGesture(host: HomeGestureHost, down: PointerInputChange) {
-    val engine = host.engine
-    val primary = down.id
-    var x = down.position.x
-    var y = down.position.y
-    host.pointerX = x
-    host.pointerY = y
-
+    val session = host.session
+    host.pointerX = down.position.x
+    host.pointerY = down.position.y
     val engineOn = host.isEnabled()
-    var external = false
-    var multi = false
-    var finished = false
+    session.begin(down.id.value, engineOn, down.position.x, down.position.y)
     if (engineOn) {
         val longPress = viewConfiguration.longPressTimeoutMillis.coerceAtLeast(MIN_LONG_PRESS_MS)
-        host.beginGesture(x, y, down.uptimeMillis, viewConfiguration.touchSlop, SwipeDistance.toPx(), longPress)
+        host.beginGesture(
+            down.position.x, down.position.y, down.uptimeMillis,
+            viewConfiguration.touchSlop, SwipeDistance.toPx(), longPress,
+        )
     } else {
         host.staleDragCheck()
     }
 
     try {
         while (true) {
-            val waitMs: Long? = if (engineOn && !external && !multi && !finished) {
-                engine.nextTimeoutMs(SystemClock.uptimeMillis())
-            } else {
-                null
-            }
+            val waitMs: Long? = session.nextTimeoutMs(SystemClock.uptimeMillis())
             val event: PointerEvent? = if (waitMs != null) {
                 withTimeoutOrNull(waitMs) { awaitPointerEvent(PointerEventPass.Initial) }
             } else {
@@ -361,73 +359,16 @@ private suspend fun AwaitPointerEventScope.trackGesture(host: HomeGestureHost, d
             }
             if (event == null) {
                 // The long-press timer elapsed without any event.
-                host.apply(engine.onTimeout(SystemClock.uptimeMillis()), null)
+                host.apply(session.onTimeout(SystemClock.uptimeMillis()), null)
                 continue
             }
-
-            val changes = event.changes
-            val pressedCount = changes.count { it.pressed }
-            val primaryChange = changes.firstOrNull { it.id == primary } ?: changes.firstOrNull()
-            if (primaryChange == null) {
-                if (pressedCount == 0) break
-                continue
-            }
-            x = primaryChange.position.x
-            y = primaryChange.position.y
-            if (primaryChange.pressed) {
-                host.pointerX = x
-                host.pointerY = y
-            }
-
-            // A drag that began outside this handler (drawer, folder popup): this finger carries it.
-            if (!external && host.hasForeignDrag()) {
-                external = true
-                if (engineOn) engine.onCancel()
-            }
-            if (external) {
-                if (primaryChange.pressed) host.externalMove(x, y) else host.externalEnd(x, y)
-                consumeAll(event)
-                if (!primaryChange.pressed) break
-                continue
-            }
-
-            if (!engineOn) {
-                if (pressedCount == 0) break
-                continue
-            }
-
-            // A second finger: a pinch, unless the engine already owns the gesture.
-            if (!engine.isActive && (multi || pressedCount >= 2)) {
-                if (!multi) {
-                    multi = true
-                    engine.onSecondPointerDown(pointerDistance(changes))
-                } else if (pressedCount >= 2) {
-                    host.apply(engine.onPinchMove(pointerDistance(changes)), event)
-                } else {
-                    engine.onPinchEnd()
-                }
-                if (pressedCount == 0) break
-                continue
-            }
-
-            if (finished) {
-                if (pressedCount == 0) break
-                continue
-            }
-
-            if (primaryChange.pressed) {
-                host.apply(engine.onMove(x, y, primaryChange.uptimeMillis), event)
-            } else {
-                host.apply(engine.onUp(x, y, primaryChange.uptimeMillis), event)
-                finished = true
-                if (pressedCount == 0) break
-            }
+            if (host.onEvent(event)) break
         }
     } catch (e: CancellationException) {
         throw e
     } catch (e: Exception) {
         CrashLog.record("home gesture", e)
     } finally {
-        host.endGesture(external)
+        host.endGesture(session.isExternal)
     }
 }

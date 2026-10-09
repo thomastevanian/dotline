@@ -51,12 +51,15 @@ class PointerSession(private val engine: GestureEngine) {
     /** True once a drag from elsewhere is carried by this sequence. */
     val isExternal: Boolean get() = external
 
-    fun begin(primaryId: Long, engineOn: Boolean) {
+    /** Starts following a sequence whose first finger [primaryId] went down at ([startX], [startY]). */
+    fun begin(primaryId: Long, engineOn: Boolean, startX: Float = 0f, startY: Float = 0f) {
         primary = primaryId
         this.engineOn = engineOn
         external = false
         multi = false
         finished = false
+        x = startX
+        y = startY
     }
 
     /** Milliseconds until the long press fires, or null when no timer is needed. */
