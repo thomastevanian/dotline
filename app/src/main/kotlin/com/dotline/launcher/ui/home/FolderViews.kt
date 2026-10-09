@@ -48,6 +48,7 @@ import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import com.dotline.launcher.data.IconShape
 import com.dotline.launcher.data.icons.AppIconView
@@ -65,24 +66,92 @@ import kotlin.math.roundToInt
  * Folders, Nothing OS style.
  *
  * FolderTile: the lighter circle on the home screen with up to four mini icons in a 2 x 2 grid.
- * Every mini icon is the real processed app icon (tile + glyph) rendered at 31 percent of the
+ * Every mini icon is the real processed app icon (tile + glyph) rendered at about a third of the
  * folder size by the normal icon pipeline, so it is cached and drawn once.
  *
  * FolderPopup: the opened folder, a rounded flat card on a scrim with a renamable Doto title and
  * a clean 4 column grid of icons with labels.
  * ------------------------------------------------------------------------------------------ */
 
-/** Mini icon diameter as a fraction of the folder diameter (spec: 31 percent). */
-private const val FOLDER_MINI_FRACTION = 0.31f
+/**
+ * Folder geometry and name rules. Plain Kotlin (no Compose types) so the numbers can be checked on any JVM.
+ */
+internal object FolderMath {
+    /**
+     * Mini icon diameter as a fraction of the folder diameter. Measured on the enlarged reference crop
+     * (ref3_icons.png, three folders, ten mini tiles): 0.338 of the folder diameter.
+     */
+    const val MINI_FRACTION = 0.34f
 
-/** Distance of every mini icon centre from the folder centre, as a fraction of the folder diameter. */
-private const val FOLDER_MINI_CENTER_FRACTION = 0.18f
+    /**
+     * Distance of every mini icon centre from the folder centre (horizontally and vertically), as a fraction of
+     * the folder diameter. Measured on the same crop: 0.19 (left/right 0.187 to 0.196, top/bottom 0.187 to 0.204).
+     */
+    const val CENTER_FRACTION = 0.19f
 
-/** Mini icons shown in a folder tile. */
-private const val FOLDER_PREVIEW_COUNT = 4
+    /** Mini icons shown in a folder tile; more apps than this show the first four. */
+    const val PREVIEW_COUNT = 4
 
-/** Longest folder name the editor accepts. */
-private const val FOLDER_NAME_MAX = 24
+    /** Longest folder name the editor accepts (the controller trims to the same length). */
+    const val NAME_MAX = 24
+
+    /** How many mini icons a folder with [appCount] apps shows. */
+    fun previewCount(appCount: Int): Int {
+        if (appCount <= 0) return 0
+        return if (appCount < PREVIEW_COUNT) appCount else PREVIEW_COUNT
+    }
+
+    /**
+     * Left (and top) edge in pixels of the first column (row) of mini icons inside a folder that is [folderPx]
+     * wide with minis of [miniPx]. The second column (row) is the mirror image, see [farEdgePx], so the minis
+     * are exactly symmetric on the pixel grid and never leave the folder.
+     */
+    fun nearEdgePx(folderPx: Int, miniPx: Int): Int {
+        if (folderPx <= 0 || miniPx <= 0) return 0
+        val room = folderPx - miniPx
+        if (room <= 0) return 0
+        val raw = room / 2f - CENTER_FRACTION * folderPx
+        val rounded = raw.roundToInt()
+        val limit = room / 2
+        return if (rounded < 0) 0 else if (rounded > limit) limit else rounded
+    }
+
+    /** Left (and top) edge in pixels of the second column (row) of mini icons: the mirror of [nearEdgePx]. */
+    fun farEdgePx(folderPx: Int, miniPx: Int): Int {
+        val room = folderPx - miniPx
+        if (room <= 0) return 0
+        return room - nearEdgePx(folderPx, miniPx)
+    }
+
+    /**
+     * The text a folder name field keeps after an edit from [old] to [new]: one line, at most [NAME_MAX]
+     * characters. Typing into a full name changes nothing; a longer paste is cut at the limit.
+     */
+    fun limitName(old: String, new: String): String {
+        val oneLine = if (new.indexOf('\n') >= 0 || new.indexOf('\r') >= 0) {
+            new.replace('\n', ' ').replace('\r', ' ')
+        } else {
+            new
+        }
+        if (oneLine.length <= NAME_MAX) return oneLine
+        if (old.length >= NAME_MAX) return old
+        var end = NAME_MAX
+        if (oneLine[end - 1].isHighSurrogate()) end -= 1
+        return oneLine.substring(0, end)
+    }
+
+    /** The name to store after editing: [typed] without surrounding blanks, or null when that is empty or equals [current]. */
+    fun renamed(typed: String, current: String): String? {
+        val trimmed = typed.trim()
+        return if (trimmed.isNotEmpty() && trimmed != current) trimmed else null
+    }
+
+    /** [index] limited to the range 0..[length]. */
+    fun clampIndex(index: Int, length: Int): Int {
+        if (index < 0) return 0
+        return if (index > length) length else index
+    }
+}
 
 /** Columns of the opened folder. */
 private const val FOLDER_COLUMNS = 4
@@ -93,7 +162,7 @@ private const val FOLDER_GRID_MAX_HEIGHT_FRACTION = 0.6f
 /** The popup card starts at this scale and grows to 1 while it fades in. */
 private const val FOLDER_ENTER_SCALE_FROM = 0.94f
 
-/** Corner radius of the rounded-square folder (same fraction the icon renderer uses for tiles). */
+/** Corner radius of the rounded-square folder (same fraction the icon renderer uses for its tiles). */
 private const val FOLDER_ROUNDED_PERCENT = 28
 
 /** Base icon size inside the opened folder; AppIconView multiplies it by the user's icon size setting. */
@@ -114,31 +183,33 @@ private fun folderShapeFor(iconShape: IconShape): Shape {
 
 /**
  * The folder as it appears on the home screen: a circle of [size] filled with the (lighter) folder
- * colour holding up to four mini icons. Mini centres sit at plus or minus 18 percent of [size] from the
- * centre; with three apps the bottom-right slot stays empty; more than four show the first four.
+ * colour holding up to four mini icons in a 2 x 2 arrangement (see [FolderMath] for the measured sizes).
+ * With three apps the bottom-right slot stays empty; with more than four the first four are shown.
  * No label: the caller draws it. [size] is the final diameter (the caller applies the icon size setting).
  */
 @Composable
 fun FolderTile(apps: List<AppInfo>, size: Dp, modifier: Modifier = Modifier) {
     val colors = DotlineTheme.colors
     val shape = folderShapeFor(LocalSettings.current.iconShape)
-    val miniSize = size * FOLDER_MINI_FRACTION
-    val centerShift = size * FOLDER_MINI_CENTER_FRACTION
-    val count = if (apps.size < FOLDER_PREVIEW_COUNT) apps.size else FOLDER_PREVIEW_COUNT
+    val density = LocalDensity.current
+    val miniSize = size * FolderMath.MINI_FRACTION
+    val folderPx = with(density) { size.roundToPx() }
+    val miniPx = with(density) { miniSize.roundToPx() }
+    val nearPx = FolderMath.nearEdgePx(folderPx, miniPx)
+    val farPx = FolderMath.farEdgePx(folderPx, miniPx)
+    val count = FolderMath.previewCount(apps.size)
     Box(
         modifier = modifier
             .size(size)
             .background(colors.folderTile, shape),
     ) {
         for (i in 0 until count) {
-            val dx = if (i % 2 == 0) -centerShift else centerShift
-            val dy = if (i < 2) -centerShift else centerShift
+            val x = if (i % 2 == 0) nearPx else farPx
+            val y = if (i < 2) nearPx else farPx
             FolderMiniIcon(
                 app = apps[i],
                 miniSize = miniSize,
-                modifier = Modifier
-                    .align(Alignment.Center)
-                    .offset(x = dx, y = dy),
+                modifier = Modifier.offset { IntOffset(x, y) },
             )
         }
     }
@@ -179,6 +250,7 @@ private fun FolderMiniIcon(app: AppInfo, miniSize: Dp, modifier: Modifier = Modi
  *
  * [onLaunch] gets the window bounds of the tapped icon (launch animation source). [onAppLongPress] gets
  * the icon's centre and top-left in root coordinates so the caller can lift the icon out of the folder.
+ * A name that is being edited is kept when the folder is closed, an app is launched or lifted out.
  * An empty folder shows nothing. Fades and scales in over 150 ms (instantly when animations are reduced).
  */
 @Composable
@@ -204,6 +276,49 @@ fun FolderPopup(
     }
 }
 
+/**
+ * State of the folder name editor. The fields are read only by the header composable, so typing
+ * recomposes the header and nothing else.
+ */
+@Stable
+private class FolderNameEditor {
+    var editing: Boolean by mutableStateOf(false)
+    var field: TextFieldValue by mutableStateOf(TextFieldValue(""))
+
+    /** Starts editing [name] with the cursor at its end. */
+    fun begin(name: String) {
+        field = TextFieldValue(text = name, selection = TextRange(name.length))
+        editing = true
+    }
+
+    /** Applies one edit coming from the text field, keeping the name to one line of at most 24 characters. */
+    fun change(value: TextFieldValue) {
+        val old = field
+        val kept = FolderMath.limitName(old.text, value.text)
+        field = when {
+            kept == value.text -> value
+            kept == old.text -> old
+            else -> TextFieldValue(
+                text = kept,
+                selection = TextRange(
+                    FolderMath.clampIndex(value.selection.start, kept.length),
+                    FolderMath.clampIndex(value.selection.end, kept.length),
+                ),
+            )
+        }
+    }
+
+    /**
+     * Ends editing. Returns the trimmed new name, or null when nothing has to be renamed (not editing,
+     * blank, or unchanged compared with [currentName]).
+     */
+    fun finish(currentName: String): String? {
+        if (!editing) return null
+        editing = false
+        return FolderMath.renamed(field.text, currentName)
+    }
+}
+
 @Composable
 private fun FolderPopupContent(
     name: String,
@@ -221,31 +336,49 @@ private fun FolderPopupContent(
     // A duplicate key would crash the lazy grid, so every app is shown once.
     val shownApps = remember(apps) { apps.distinctBy { app -> app.key.flat } }
 
-    var editing by remember { mutableStateOf(false) }
-    var nameField by remember { mutableStateOf(TextFieldValue(name)) }
+    val editor = remember { FolderNameEditor() }
+    val latestName by rememberUpdatedState(name)
+    val latestRename by rememberUpdatedState(onRename)
+    val latestLaunch by rememberUpdatedState(onLaunch)
+    val latestLongPress by rememberUpdatedState(onAppLongPress)
+    val latestDismiss by rememberUpdatedState(onDismiss)
 
-    fun commitName() {
-        val trimmed = nameField.text.trim()
-        editing = false
-        focusManager.clearFocus()
-        if (trimmed.isNotEmpty() && trimmed != name) {
-            onRename(trimmed)
+    // Every way out of the name editor (keyboard Done, tap on the card, close, launch, lift out) lands here.
+    val finishEditing: () -> Unit = remember(editor, focusManager) {
+        {
+            if (editor.editing) {
+                focusManager.clearFocus()
+                val renamed = editor.finish(latestName)
+                if (renamed != null) latestRename(renamed)
+            }
+        }
+    }
+    val dismiss: () -> Unit = remember(finishEditing) {
+        {
+            finishEditing()
+            latestDismiss()
+        }
+    }
+    val launchApp: (AppInfo, AndroidRect?) -> Unit = remember(finishEditing) {
+        { app: AppInfo, bounds: AndroidRect? ->
+            finishEditing()
+            latestLaunch(app, bounds)
+        }
+    }
+    val liftApp: (AppInfo, Offset, Offset) -> Unit = remember(finishEditing) {
+        { app: AppInfo, center: Offset, topLeft: Offset ->
+            finishEditing()
+            latestLongPress(app, center, topLeft)
         }
     }
 
-    fun startEditing() {
-        nameField = TextFieldValue(text = name, selection = TextRange(name.length))
-        editing = true
-    }
-
-    // Closing while the name is being edited keeps what was typed.
-    val dismiss: () -> Unit = {
-        if (editing) {
-            commitName()
+    // The folder can also vanish without any of the above (home button, last app removed): keep the typed name.
+    DisposableEffect(editor) {
+        onDispose {
+            val renamed = editor.finish(latestName)
+            if (renamed != null) latestRename(renamed)
         }
-        onDismiss()
     }
-    val latestDismiss by rememberUpdatedState(dismiss)
 
     BackHandler {
         dismiss()
@@ -266,8 +399,8 @@ private fun FolderPopupContent(
             .drawBehind {
                 drawRect(color = scrimColor, alpha = enter.value)
             }
-            .pointerInput(Unit) {
-                detectTapGestures(onTap = { latestDismiss() })
+            .pointerInput(dismiss) {
+                detectTapGestures(onTap = { dismiss() })
             },
     ) {
         BoxWithConstraints(
@@ -291,20 +424,17 @@ private fun FolderPopupContent(
                         scaleY = s
                     }
                     .background(colors.widget, FolderPopupShape)
-                    // Swallow taps on the card so they never reach the scrim behind it.
-                    .pointerInput(Unit) {
-                        detectTapGestures(onTap = { })
+                    // A tap on the card never reaches the scrim behind it; on the bare card it ends a name edit.
+                    .pointerInput(finishEditing) {
+                        detectTapGestures(onTap = { finishEditing() })
                     }
                     .padding(top = 16.dp, bottom = 12.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 FolderNameHeader(
+                    editor = editor,
                     name = name,
-                    editing = editing,
-                    nameField = nameField,
-                    onStartEditing = { startEditing() },
-                    onFieldChange = { value: TextFieldValue -> nameField = clampFolderName(value) },
-                    onDone = { commitName() },
+                    onDone = finishEditing,
                 )
                 Spacer(Modifier.height(8.dp))
                 LazyVerticalGrid(
@@ -318,8 +448,8 @@ private fun FolderPopupContent(
                     items(items = shownApps, key = { app -> app.key.flat }) { app ->
                         FolderAppCell(
                             app = app,
-                            onLaunch = onLaunch,
-                            onLongPress = onAppLongPress,
+                            onLaunch = launchApp,
+                            onLongPress = liftApp,
                         )
                     }
                 }
@@ -331,24 +461,21 @@ private fun FolderPopupContent(
 /**
  * The folder name in the Doto heading style with a tiny caption. Tapping the name turns it into a
  * single-line text field (same dot-matrix look, a dotted underline marks it as editable); the IME
- * Done action commits.
+ * Done action calls [onDone].
  */
 @Composable
 private fun FolderNameHeader(
+    editor: FolderNameEditor,
     name: String,
-    editing: Boolean,
-    nameField: TextFieldValue,
-    onStartEditing: () -> Unit,
-    onFieldChange: (TextFieldValue) -> Unit,
     onDone: () -> Unit,
 ) {
     val colors = DotlineTheme.colors
     val type = DotlineTheme.type
     val primary = colors.primary
+    val secondary = colors.secondary
     val titleStyle = remember(type, primary) {
         type.heading.copy(color = primary, textAlign = TextAlign.Center)
     }
-    val secondary = colors.secondary
     val captionStyle = remember(type, secondary) {
         type.caption.copy(color = secondary, textAlign = TextAlign.Center)
     }
@@ -356,6 +483,7 @@ private fun FolderNameHeader(
         TextSelectionColors(handleColor = primary, backgroundColor = primary.copy(alpha = 0.3f))
     }
     val shownName = if (name.isBlank()) "Folder" else name
+    val editing = editor.editing
 
     Column(
         modifier = Modifier
@@ -372,31 +500,37 @@ private fun FolderNameHeader(
                     // The field is not attached yet; the user can tap it to focus.
                 }
             }
-            CompositionLocalProvider(LocalTextSelectionColors provides selectionColors) {
-                BasicTextField(
-                    value = nameField,
-                    onValueChange = onFieldChange,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(min = 40.dp)
-                        .focusRequester(focusRequester),
-                    textStyle = titleStyle,
-                    keyboardOptions = KeyboardOptions(
-                        capitalization = KeyboardCapitalization.Words,
-                        imeAction = ImeAction.Done,
-                    ),
-                    keyboardActions = KeyboardActions(onDone = { onDone() }),
-                    singleLine = true,
-                    cursorBrush = SolidColor(primary),
-                )
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 48.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                CompositionLocalProvider(LocalTextSelectionColors provides selectionColors) {
+                    BasicTextField(
+                        value = editor.field,
+                        onValueChange = { value: TextFieldValue -> editor.change(value) },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .focusRequester(focusRequester),
+                        textStyle = titleStyle,
+                        keyboardOptions = KeyboardOptions(
+                            capitalization = KeyboardCapitalization.Words,
+                            imeAction = ImeAction.Done,
+                        ),
+                        keyboardActions = KeyboardActions(onDone = { onDone() }),
+                        singleLine = true,
+                        cursorBrush = SolidColor(primary),
+                    )
+                }
             }
             DottedDivider(Modifier.padding(horizontal = 12.dp))
         } else {
             Box(
                 modifier = Modifier
-                    .heightIn(min = 40.dp)
+                    .heightIn(min = 48.dp)
                     .semantics { role = Role.Button }
-                    .flatClickable(shape = DotlineTheme.shapes.chip, onClick = onStartEditing)
+                    .flatClickable(shape = DotlineTheme.shapes.chip, onClick = { editor.begin(name) })
                     .padding(horizontal = 12.dp, vertical = 6.dp),
                 contentAlignment = Alignment.Center,
             ) {
@@ -407,6 +541,8 @@ private fun FolderNameHeader(
                     overflow = TextOverflow.Ellipsis,
                 )
             }
+            // Same height as the dotted underline of the editor, so the grid does not jump when editing starts.
+            Spacer(Modifier.height(6.dp))
         }
         Spacer(Modifier.height(2.dp))
         BasicText(
@@ -414,21 +550,6 @@ private fun FolderNameHeader(
             style = captionStyle,
         )
     }
-}
-
-/** Keeps a folder name to [FOLDER_NAME_MAX] characters on one line. */
-private fun clampFolderName(value: TextFieldValue): TextFieldValue {
-    val cleaned = value.text.replace('\n', ' ')
-    if (cleaned.length <= FOLDER_NAME_MAX) {
-        if (cleaned == value.text) return value
-        return TextFieldValue(text = cleaned, selection = TextRange(cleaned.length))
-    }
-    var end = FOLDER_NAME_MAX
-    if (cleaned[end - 1].isHighSurrogate()) {
-        end -= 1
-    }
-    val cut = cleaned.substring(0, end)
-    return TextFieldValue(text = cut, selection = TextRange(cut.length))
 }
 
 /**
@@ -471,8 +592,7 @@ private fun FolderAppCell(
     val settings = LocalSettings.current
     val density = LocalDensity.current
     val holder = remember { FolderCellBounds() }
-    val tileDp = FolderPopupIconBase * settings.iconSize
-    val tilePx = with(density) { tileDp.toPx() }
+    val tilePx = with(density) { (FolderPopupIconBase * settings.iconSize).roundToPx() }.toFloat()
     val describe: Modifier = if (settings.showLabels) {
         Modifier
     } else {

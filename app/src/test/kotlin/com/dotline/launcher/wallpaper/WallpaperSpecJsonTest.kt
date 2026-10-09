@@ -1,9 +1,13 @@
 package com.dotline.launcher.wallpaper
 
+import kotlin.math.abs
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
+import org.json.JSONArray
 import org.json.JSONObject
 
 class WallpaperSpecJsonTest {
@@ -142,5 +146,180 @@ class WallpaperSpecJsonTest {
         assertNull(WallpaperSpecJson.fromJsonString("not json"))
         assertNull(WallpaperSpecJson.fromJsonString("[1,2]"))
         assertNotNull(WallpaperSpecJson.fromJsonString("{}"))
+    }
+}
+
+class WallpaperPresetsJsonTest {
+    private val specJson = WallpaperSpecJson.encode(WallpaperSpec())
+
+    private fun preset(id: String, name: String, seed: Long) =
+        WallpaperPreset(id, name, WallpaperSpec(WallpaperPattern.HALFTONE, seed = seed, text = "x"))
+
+    private fun entry(id: String?, name: String?): JSONObject {
+        val o = JSONObject()
+        if (id != null) o.put("id", id)
+        if (name != null) o.put("name", name)
+        o.put("spec", specJson)
+        return o
+    }
+
+    @Test
+    fun listRoundTripsThroughJsonText() {
+        val list = listOf(preset("uaaaa1111", "One", 1L), preset("ubbbb2222", "Two", 2L), preset("ucccc3333", "Three", -9L))
+        val back = WallpaperPresetsJson.parse(JSONArray(WallpaperPresetsJson.toJson(list).toString()))
+        assertEquals(list, back)
+    }
+
+    @Test
+    fun emptyAndGarbageInputGiveNoPresets() {
+        assertEquals(0, WallpaperPresetsJson.parse(JSONArray()).size)
+        assertEquals(0, WallpaperPresetsJson.parse(JSONArray("[[],[1],\"a\",null]")).size)
+    }
+
+    @Test
+    fun entriesWithoutAReadableSpecAreSkipped() {
+        val arr = JSONArray(
+            "[1, null, \"text\", {\"id\":\"u1\",\"name\":\"no spec\"}, " +
+                "{\"id\":\"u2\",\"name\":\"ok\",\"spec\":{\"pattern\":\"CONCENTRIC\"}}, {\"spec\":5}]",
+        )
+        val out = WallpaperPresetsJson.parse(arr)
+        assertEquals(1, out.size)
+        assertEquals("u2", out[0].id)
+        assertEquals("ok", out[0].name)
+        assertEquals(WallpaperPattern.CONCENTRIC, out[0].spec.pattern)
+    }
+
+    @Test
+    fun oddFieldTypesFallBack() {
+        val out = WallpaperPresetsJson.parse(JSONArray("[{\"id\":5,\"name\":null,\"spec\":{}}]"))
+        assertEquals(1, out.size)
+        assertEquals("Preset", out[0].name)
+        assertEquals(WallpaperSpec(), out[0].spec)
+        assertTrue(out[0].id.startsWith("u"))
+    }
+
+    @Test
+    fun namesAreCleaned() {
+        assertEquals("Preset", WallpaperPresetsJson.cleanName(""))
+        assertEquals("Preset", WallpaperPresetsJson.cleanName("   "))
+        assertEquals("Night", WallpaperPresetsJson.cleanName("  Night  "))
+        assertEquals(WallpaperPresetsJson.MAX_NAME, WallpaperPresetsJson.cleanName("N".repeat(100)).length)
+        // A cut that ends in spaces leaves no trailing space.
+        assertEquals("ab", WallpaperPresetsJson.cleanName("ab" + " ".repeat(60) + "c"))
+    }
+
+    @Test
+    fun idsAreMadeUniqueAndStartWithU() {
+        val arr = JSONArray()
+        for (id in listOf("u1", "u1", "grid_dark", "", "x9")) arr.put(entry(id, "n"))
+        arr.put(entry(null, "no id"))
+        val out = WallpaperPresetsJson.parse(arr)
+        assertEquals(6, out.size)
+        assertEquals("u1", out[0].id)
+        val ids = out.map { it.id }
+        assertEquals(ids.size, ids.toSet().size)
+        for (id in ids) assertTrue(id.startsWith("u"), id)
+    }
+
+    @Test
+    fun builtInIdsNeverClashWithUserIds() {
+        for (preset in WallpaperPresets.all) assertFalse(preset.id.startsWith("u"), preset.id)
+    }
+
+    @Test
+    fun newIdLooksRightAndAvoidsExistingIds() {
+        val id = WallpaperPresetsJson.newId(emptyList())
+        assertEquals(9, id.length)
+        assertTrue(id.startsWith("u"))
+        assertTrue(id.substring(1).all { it in "0123456789abcdef" }, id)
+        val taken = HashSet<String>()
+        repeat(200) {
+            val next = WallpaperPresetsJson.newId(taken)
+            assertFalse(next in taken)
+            taken.add(next)
+        }
+    }
+
+    @Test
+    fun atMostSixtyPresetsAreKept() {
+        val arr = JSONArray()
+        for (i in 0 until 100) arr.put(entry("u" + i, "n" + i))
+        val out = WallpaperPresetsJson.parse(arr)
+        assertEquals(WallpaperPresetsJson.MAX_PRESETS, out.size)
+        assertEquals("u0", out.first().id)
+    }
+}
+
+class WallpaperSizingTest {
+    private fun check(a: Int, b: Int, w: Int, h: Int) {
+        val size = WallpaperSizing.exportSize(a, b)
+        assertEquals(w, size.width, "width for " + a + " x " + b)
+        assertEquals(h, size.height, "height for " + a + " x " + b)
+    }
+
+    @Test
+    fun commonPhonesKeepTheirExactSize() {
+        check(1080, 2400, 1080, 2400)
+        check(1080, 2340, 1080, 2340)
+        check(720, 1600, 720, 1600)
+        check(1440, 3120, 1440, 3120)
+        check(1440, 3200, 1440, 3200)
+    }
+
+    @Test
+    fun orderOfTheTwoNumbersDoesNotMatter() {
+        check(2400, 1080, 1080, 2400)
+        check(3120, 1440, 1440, 3120)
+    }
+
+    @Test
+    fun nothingIsScaledUp() {
+        check(540, 960, 540, 960)
+    }
+
+    @Test
+    fun bigScreensAreScaledDownKeepingTheirShape() {
+        check(2160, 4800, 1440, 3200)
+        val size = WallpaperSizing.exportSize(1812, 3840)
+        assertTrue(size.width <= WallpaperSizing.MAX_WIDTH && size.height <= WallpaperSizing.MAX_HEIGHT)
+        assertTrue(abs(size.width.toDouble() / size.height - 1812.0 / 3840.0) < 0.002)
+    }
+
+    @Test
+    fun badInputGivesACommonPhoneSize() {
+        check(0, 0, 1080, 2400)
+        check(-5, 100, 1080, 2400)
+        check(100, 0, 1080, 2400)
+    }
+
+    @Test
+    fun extremeShapesNeverReachZeroPixels() {
+        val size = WallpaperSizing.exportSize(1, 100000)
+        assertTrue(size.width >= 1)
+        assertEquals(WallpaperSizing.MAX_HEIGHT, size.height)
+    }
+
+    @Test
+    fun previewHeightFollowsTheScreenShape() {
+        assertEquals(800, WallpaperSizing.heightFor(360, PixelSize(1080, 2400)))
+        assertEquals(190, WallpaperSizing.heightFor(90, PixelSize(1080, 2280)))
+        assertEquals(1, WallpaperSizing.heightFor(1, PixelSize(1000, 1)))
+    }
+}
+
+class WallpaperPresetRangesTest {
+    @Test
+    fun thereAreTwentyFourBuiltInPresetsWithUniqueIds() {
+        assertEquals(24, WallpaperPresets.all.size)
+        assertEquals(24, WallpaperPresets.all.map { it.id }.toSet().size)
+    }
+
+    @Test
+    fun builtInPresetsFitTheStudioSliders() {
+        // The Studio sliders cover dot size 0.15..1 and spacing 0.012..0.09.
+        for (preset in WallpaperPresets.all) {
+            assertTrue(preset.spec.dotSize in 0.15f..1f, preset.id + " dotSize " + preset.spec.dotSize)
+            assertTrue(preset.spec.spacing in 0.012f..0.09f, preset.id + " spacing " + preset.spec.spacing)
+        }
     }
 }

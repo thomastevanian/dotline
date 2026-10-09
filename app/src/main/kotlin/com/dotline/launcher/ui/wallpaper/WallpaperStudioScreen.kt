@@ -34,6 +34,7 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
@@ -121,13 +122,20 @@ private fun thumbKey(preset: WallpaperPreset): String = preset.id + ":" + preset
 private fun targetLabel(target: WallpaperApplier.Target): String = when (target) {
     WallpaperApplier.Target.HOME -> "Home screen"
     WallpaperApplier.Target.LOCK -> "Lock screen"
-    WallpaperApplier.Target.BOTH -> "Home and lock screens"
+    WallpaperApplier.Target.BOTH -> "Both"
 }
 
 private fun targetHint(target: WallpaperApplier.Target): String = when (target) {
     WallpaperApplier.Target.HOME -> "Behind your apps and widgets"
     WallpaperApplier.Target.LOCK -> "Shown while the phone is locked"
-    WallpaperApplier.Target.BOTH -> "Use the same wallpaper everywhere"
+    WallpaperApplier.Target.BOTH -> "The same wallpaper on home and lock screens"
+}
+
+/** Status line after a successful apply. */
+private fun targetDone(target: WallpaperApplier.Target): String = when (target) {
+    WallpaperApplier.Target.HOME -> "Applied to the home screen"
+    WallpaperApplier.Target.LOCK -> "Applied to the lock screen"
+    WallpaperApplier.Target.BOTH -> "Applied to home and lock screens"
 }
 
 /** "55%" for the dot size slider. */
@@ -247,7 +255,7 @@ fun WallpaperStudioScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
             busy = false
             applyOpen = false
             status = if (error == null) {
-                "Applied to " + targetLabel(target)
+                targetDone(target)
             } else {
                 "Could not apply: " + (error.message ?: error.javaClass.simpleName).take(80)
             }
@@ -362,18 +370,21 @@ fun WallpaperStudioScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
                         valueRange = 0.012f..0.09f,
                         valueLabel = tenthsLabel(spec.spacing),
                     )
-                    SettingsRow(
-                        title = "Variation",
-                        subtitle = "Pattern number " + (((spec.seed % 100000L) + 100000L) % 100000L).toString(),
-                        onClick = { update { it.copy(seed = Random.nextLong()) } },
-                        trailing = {
-                            PillButton(
-                                text = "Shuffle",
-                                onClick = { update { it.copy(seed = Random.nextLong()) } },
-                                filled = false,
-                            )
-                        },
-                    )
+                    // Dot text has no random part, so the seed row would do nothing there.
+                    if (spec.pattern != WallpaperPattern.DOT_TEXT) {
+                        SettingsRow(
+                            title = "Variation",
+                            subtitle = "Pattern number " + (((spec.seed % 100000L) + 100000L) % 100000L).toString(),
+                            onClick = { update { it.copy(seed = Random.nextLong()) } },
+                            trailing = {
+                                PillButton(
+                                    text = "Shuffle",
+                                    onClick = { update { it.copy(seed = Random.nextLong()) } },
+                                    filled = false,
+                                )
+                            },
+                        )
+                    }
                 }
 
                 SectionLabel("Colours")
@@ -515,6 +526,7 @@ private fun ChoiceChip(label: String, selected: Boolean, onClick: () -> Unit) {
         Modifier
             .heightIn(min = 44.dp)
             .background(if (selected) colors.highlight else colors.card, shape)
+            .semantics { this.selected = selected }
             .flatClickable(shape, onClick = onClick)
             .padding(horizontal = 16.dp, vertical = 10.dp),
         contentAlignment = Alignment.Center,
@@ -631,7 +643,10 @@ private fun SwatchDot(swatch: Swatch, selected: Boolean, onSelect: (Int) -> Unit
     Box(
         Modifier
             .size(48.dp)
-            .semantics { contentDescription = swatch.label }
+            .semantics {
+                contentDescription = swatch.label
+                this.selected = selected
+            }
             .flatClickable(CircleShape, onClick = { onSelect(swatch.color) }),
         contentAlignment = Alignment.Center,
     ) {
@@ -700,6 +715,10 @@ private fun PresetThumb(
                 .size(width = 56.dp, height = 118.dp)
                 .clip(shape)
                 .background(Color(preset.spec.effectiveBackground))
+                .semantics {
+                    contentDescription = preset.name
+                    this.selected = selected
+                }
                 .flatClickable(shape, onLongClick = longClick, onClick = { onPick(preset) })
                 .border(
                     width = if (selected) 2.dp else 1.dp,

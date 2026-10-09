@@ -3,6 +3,7 @@ package com.dotline.launcher.wallpaper
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Paint
+import androidx.compose.runtime.Immutable
 
 /**
  * Draws a [WallpaperSpec] into a bitmap of an exact pixel size. Flat only: a solid background and
@@ -44,7 +45,8 @@ object WallpaperRenderer {
 }
 
 /** Width x height in pixels. */
-class PixelSize(val width: Int, val height: Int)
+@Immutable
+data class PixelSize(val width: Int, val height: Int)
 
 /** Pure size maths for the studio: the phone's portrait pixel size, capped, and preview heights. */
 object WallpaperSizing {

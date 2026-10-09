@@ -20,6 +20,7 @@ import com.dotline.launcher.data.model.FolderItem
 import com.dotline.launcher.data.model.HomeLayout
 import com.dotline.launcher.data.model.HostedWidgetItem
 import com.dotline.launcher.home.DragSource
+import com.dotline.launcher.home.DropTarget
 import com.dotline.launcher.home.DropOutcome
 import com.dotline.launcher.home.GestureConfig
 import com.dotline.launcher.home.GestureEngine
@@ -35,7 +36,6 @@ import com.dotline.launcher.home.PointerSession
 import com.dotline.launcher.home.ScrollRequest
 import com.dotline.launcher.home.ZoneSet
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.withTimeoutOrNull
 
 /* ------------------------------------------------------------------------------------------
  * ONE pointer handler for the whole home screen.
@@ -52,6 +52,9 @@ private val SwipeDistance = 96.dp
 
 /** A long press is never shorter than this, whatever the system setting says. */
 private const val MIN_LONG_PRESS_MS = 350L
+
+/** While a dragged item rests in a screen edge band, the "turn the page" dwell is re-checked this often. */
+private const val EDGE_TICK_MS = 100L
 
 /**
  * Everything the pointer handler needs. All inputs are read live (at event time) through the
@@ -222,12 +225,15 @@ internal class HomeGestureHost(
 
     private fun onLongPress(x: Float, y: Float, onItem: Boolean) {
         val s = settingsProvider()
-        haptic()
         if (!onItem) {
-            if (!s.lockLayout && !controller.ui.value.editMode) controller.enterEdit()
+            // Empty space: edit mode, unless the layout is locked or the home screen is already being edited.
+            if (s.lockLayout || controller.ui.value.editMode) return
+            haptic()
+            controller.enterEdit()
             return
         }
         val hit = itemAt(x, y) ?: return
+        haptic()
         pressedItem = hit
         val item = hit.item
         val menu: HomeMenu? = when (item) {
@@ -277,6 +283,22 @@ internal class HomeGestureHost(
         dragEnd(x, y)
     }
 
+    /**
+     * Milliseconds until the drag should be re-evaluated even without finger movement: only while a held
+     * item rests in the left or right edge band (a still finger sends no events, but must still turn the page).
+     */
+    fun nextDragTickMs(): Long? {
+        val drag = controller.ui.value.drag ?: return null
+        val target = drag.target
+        return if (target == DropTarget.EdgeLeft || target == DropTarget.EdgeRight) EDGE_TICK_MS else null
+    }
+
+    /** Re-evaluates the drag at the last finger position (see [nextDragTickMs]). */
+    fun onDragTick() {
+        val drag = controller.ui.value.drag ?: return
+        dragMove(drag.x, drag.y)
+    }
+
     /** An app was long-pressed inside the open folder: lift it out and let the finger carry it. */
     fun beginFolderDrag(folderId: String, app: AppInfo, rootCenter: Offset, rootTopLeft: Offset) {
         if (settingsProvider().lockLayout || controller.ui.value.drag != null) return
@@ -286,7 +308,7 @@ internal class HomeGestureHost(
         val halfH = (rootCenter.y - rootTopLeft.y).coerceAtLeast(1f)
         val grabX = (pointerX - rootTopLeft.x).coerceIn(0f, halfW * 2f)
         val grabY = (pointerY - rootTopLeft.y).coerceIn(0f, halfH * 2f)
-        haptic()
+        // No haptic here: the folder cell's long click has just vibrated.
         controller.beginDrag(source, grabX, grabY, pointerX, pointerY, geo, pager.logicalPage)
     }
 
@@ -353,15 +375,23 @@ private suspend fun AwaitPointerEventScope.trackGesture(host: HomeGestureHost, d
 
     try {
         while (true) {
-            val waitMs: Long? = session.nextTimeoutMs(SystemClock.uptimeMillis())
+            val pressWait: Long? = session.nextTimeoutMs(SystemClock.uptimeMillis())
+            val tickWait: Long? = host.nextDragTickMs()
+            val waitMs: Long? = when {
+                pressWait == null -> tickWait
+                tickWait == null -> pressWait
+                else -> minOf(pressWait, tickWait)
+            }
+            // withTimeoutOrNull here is the member of AwaitPointerEventScope (the only suspending call allowed).
             val event: PointerEvent? = if (waitMs != null) {
                 withTimeoutOrNull(waitMs) { awaitPointerEvent(PointerEventPass.Initial) }
             } else {
                 awaitPointerEvent(PointerEventPass.Initial)
             }
             if (event == null) {
-                // The long-press timer elapsed without any event.
+                // A timer elapsed without any event: the long press may be due, or a drag held at an edge.
                 host.apply(session.onTimeout(SystemClock.uptimeMillis()), null)
+                host.onDragTick()
                 continue
             }
             if (host.onEvent(event)) break

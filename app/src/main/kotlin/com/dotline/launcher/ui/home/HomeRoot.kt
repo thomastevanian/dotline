@@ -135,23 +135,23 @@ internal class HomeMetrics {
     private var cachedZones = ZoneSet.NONE
     private var cachedDensity = 0f
 
-    fun setScreen(r: FRect) {
+    fun updateScreen(r: FRect) {
         if (r != screen) { screen = r; version++ }
     }
 
-    fun setSafe(r: FRect) {
+    fun updateSafe(r: FRect) {
         if (r != safe) { safe = r; version++ }
     }
 
-    fun setPageArea(r: FRect) {
+    fun updatePageArea(r: FRect) {
         if (r != pageArea) { pageArea = r; version++ }
     }
 
-    fun setDock(r: FRect?) {
+    fun updateDock(r: FRect?) {
         if (r != dock) { dock = r; version++ }
     }
 
-    fun setPanel(r: FRect?) {
+    fun updatePanel(r: FRect?) {
         if (r != panel) panel = r
     }
 
@@ -484,6 +484,24 @@ fun HomeRoot(
         { id: String -> controller.openFolder(id) }
     }
     val hiddenId = remember(slices) { { slices.draggedItemId } }
+    val isEditing = remember(slices) { { slices.editMode } }
+
+    // Opening Settings or the Wallpaper Studio from the edit panel leaves edit mode first, so the home
+    // screen is back to normal when the user returns.
+    val openSettingsState = rememberUpdatedState(onOpenSettings)
+    val openWallpaperState = rememberUpdatedState(onOpenWallpaperStudio)
+    val openSettings = remember(controller) {
+        {
+            controller.exitEdit()
+            openSettingsState.value()
+        }
+    }
+    val openWallpaper = remember(controller) {
+        {
+            controller.exitEdit()
+            openWallpaperState.value()
+        }
+    }
 
     CompositionLocalProvider(LocalWidgetActions provides flows.widgetActions) {
         // The root Box sits at the origin of the composition and fills the screen: pointer positions
@@ -494,7 +512,7 @@ fun HomeRoot(
                 .drawBehind {
                     if (dim > 0f) drawRect(color = Color.Black, alpha = dim)
                 }
-                .onGloballyPositioned { metrics.setScreen(it.boundsInRoot().toFRect()) }
+                .onGloballyPositioned { metrics.updateScreen(it.boundsInRoot().toFRect()) }
                 .homeGestures(host),
         ) {
             val cols = settings.gridColumns
@@ -503,8 +521,8 @@ fun HomeRoot(
             val iconBase = gridWidth / cols * HomeLayoutMath.ICON_FRACTION
             val tileDp = iconBase * settings.iconSize
             val dockHeight = tileDp + HomeDims.DockVerticalPad * 2
-            val render = remember(appIndex, iconBase, editMode, dotsState, onLaunch, onOpenFolder) {
-                HomeRender(appIndex, iconBase, editMode, dotsState, onLaunch, onOpenFolder)
+            val render = remember(appIndex, iconBase, isEditing, dotsState, onLaunch, onOpenFolder) {
+                HomeRender(appIndex, iconBase, isEditing, dotsState, onLaunch, onOpenFolder)
             }
             // While editing or dragging the pages start lower, below the button panel / drop zones.
             val insetSpec: AnimationSpec<Float> = if (reduceMotion) {
@@ -529,7 +547,7 @@ fun HomeRoot(
                     .statusBarsPadding()
                     .displayCutoutPadding()
                     .navigationBarsPadding()
-                    .onGloballyPositioned { metrics.setSafe(it.boundsInRoot().toFRect()) },
+                    .onGloballyPositioned { metrics.updateSafe(it.boundsInRoot().toFRect()) },
             ) {
                 HorizontalPager(
                     state = pagerState,
@@ -544,7 +562,7 @@ fun HomeRoot(
                                 placeable.place(0, inset)
                             }
                         }
-                        .onGloballyPositioned { metrics.setPageArea(it.boundsInRoot().toFRect()) },
+                        .onGloballyPositioned { metrics.updatePageArea(it.boundsInRoot().toFRect()) },
                     beyondViewportPageCount = if (infinite) 1 else pageCount,
                     userScrollEnabled = !slices.dragging,
                 ) { page ->
@@ -584,8 +602,8 @@ fun HomeRoot(
             EditChrome(
                 env = env,
                 onOpenWidgets = { controller.openPicker() },
-                onOpenWallpaper = onOpenWallpaperStudio,
-                onOpenSettings = onOpenSettings,
+                onOpenWallpaper = openWallpaper,
+                onOpenSettings = openSettings,
             )
             DragHints(env = env, layout = layout, cols = cols, rows = rows, tileDp = tileDp)
             HomeOverlayHost(

@@ -25,7 +25,7 @@ object GlyphsGoogle {
         // A plain G: open ring with a bar.
         entry(
             glyph("google_search") {
-                arc(12f, 12f, 8.2f, -45f, -315f)
+                arc(12f, 12f, 8.2f, 0f, 315f)
                 line(20.2f, 12f, 12.5f, 12f)
             },
             "com.google.android.googlequicksearchbox", "com.google.android.apps.searchlite",
@@ -48,10 +48,10 @@ object GlyphsGoogle {
         // Shopping bag with a play triangle.
         entry(
             glyph("play_store") {
-                rect(4.5f, 7.5f, 15f, 13f, 2.5f)
-                arc(12f, 8f, 3.4f, 180f, 180f)
-                poly(10.4f, 11.8f, 15f, 14.5f, 10.4f, 17.2f, closed = true, fill = true)
-                poly(10.4f, 11.8f, 15f, 14.5f, 10.4f, 17.2f, closed = true)
+                rect(4.5f, 7.2f, 15f, 13f, 2.5f)
+                arc(12f, 7.2f, 3.3f, 180f, 180f)
+                poly(10.4f, 11.2f, 15.1f, 13.9f, 10.4f, 16.6f, closed = true, fill = true)
+                poly(10.4f, 11.2f, 15.1f, 13.9f, 10.4f, 16.6f, closed = true)
             },
             "com.android.vending",
         ),
@@ -73,29 +73,24 @@ object GlyphsGoogle {
             },
             "com.google.android.apps.youtube.music",
         ),
-        // Pinwheel of four petals.
+        // Pinwheel of four D-shaped petals; the flat edges run along the cross through the centre.
         entry(
             glyph("google_photos") {
-                path { move(12f, 11f); line(12f, 3.7f); cubic(17.94f, 3.7f, 18.6f, 10.5f, 13.65f, 11f); close() }
-                path { move(13f, 12f); line(20.3f, 12f); cubic(20.3f, 17.94f, 13.5f, 18.6f, 13f, 13.65f); close() }
-                path { move(12f, 13f); line(12f, 20.3f); cubic(6.06f, 20.3f, 5.4f, 13.5f, 10.35f, 13f); close() }
-                path { move(11f, 12f); line(3.7f, 12f); cubic(3.7f, 6.06f, 10.5f, 5.4f, 11f, 10.35f); close() }
+                path { move(12f, 10.4f); line(12f, 3.4f); cubic(20.6f, 3.4f, 20.6f, 10.4f, 12f, 10.4f); close() }
+                path { move(13.6f, 12f); line(20.6f, 12f); cubic(20.6f, 20.6f, 13.6f, 20.6f, 13.6f, 12f); close() }
+                path { move(12f, 13.6f); line(12f, 20.6f); cubic(3.4f, 20.6f, 3.4f, 13.6f, 12f, 13.6f); close() }
+                path { move(10.4f, 12f); line(3.4f, 12f); cubic(3.4f, 3.4f, 10.4f, 3.4f, 10.4f, 12f); close() }
             },
             "com.google.android.apps.photos", "com.google.android.apps.photosgo",
         ),
         // Drive: a triangle built from three separate bars.
         entry(
             glyph("google_drive") {
-                line(10.4f, 7.07f, 4.9f, 16.63f)
-                line(13.6f, 7.07f, 19.1f, 16.63f)
-                line(6.5f, 19.4f, 17.5f, 19.4f)
+                line(10.4f, 4.45f, 3.75f, 15.98f)
+                line(13.6f, 4.45f, 20.25f, 15.98f)
+                line(5.35f, 18.75f, 18.65f, 18.75f)
             },
             "com.google.android.apps.docs",
-        ),
-        entry(
-            glyph("drive_b") {
-                poly(12f, 4.3f, 20.7f, 19.4f, 3.3f, 19.4f, closed = true)
-            },
         ),
         // Page with a folded corner and text lines.
         entry(
@@ -122,9 +117,9 @@ object GlyphsGoogle {
                     quad(5.5f, 3.5f, 7.5f, 3.5f); close()
                 }
                 poly(13.5f, 3.5f, 13.5f, 8.5f, 18.5f, 8.5f)
-                line(5.5f, 13f, 18.5f, 13f)
-                line(5.5f, 16.8f, 18.5f, 16.8f)
-                line(12f, 13f, 12f, 20.5f)
+                line(5.5f, 12.4f, 18.5f, 12.4f)
+                line(5.5f, 16.4f, 18.5f, 16.4f)
+                line(12f, 12.4f, 12f, 20.5f)
             },
             "com.google.android.apps.docs.editors.sheets",
         ),
@@ -145,8 +140,8 @@ object GlyphsGoogle {
         // Video camera.
         entry(
             glyph("google_meet") {
-                rect(3.5f, 6.5f, 12.5f, 11f, 2.8f)
-                poly(16f, 10.6f, 20.5f, 7.8f, 20.5f, 16.2f, 16f, 13.4f)
+                rect(3.5f, 6f, 12.5f, 12f, 3f)
+                poly(16f, 10.5f, 20.5f, 7.4f, 20.5f, 16.6f, 16f, 13.5f)
             },
             "com.google.android.apps.tachyon", "com.google.android.apps.meetings",
         ),
@@ -159,35 +154,17 @@ object GlyphsGoogle {
             },
             "com.google.android.keep",
         ),
-        // An A and a simple stroke character.
+        // A stroke character at the top left and an A at the bottom right.
         entry(
             glyph("google_translate") {
-                poly(3.5f, 11.5f, 7.5f, 3.5f, 11.5f, 11.5f)
-                line(5.2f, 8.6f, 9.8f, 8.6f)
-                line(16.5f, 12.6f, 16.5f, 14.6f)
-                line(13f, 14.6f, 20.2f, 14.6f)
-                line(14.5f, 14.6f, 18.8f, 20.5f)
-                line(18.5f, 14.6f, 14.2f, 20.5f)
+                line(3.5f, 6.2f, 12.5f, 6.2f)
+                line(8f, 3.5f, 8.6f, 5.2f)
+                path { move(9.6f, 7f); cubic(9f, 9.6f, 7f, 11.7f, 4.2f, 12.7f) }
+                path { move(5.7f, 7.6f); cubic(6.8f, 10.4f, 9.6f, 12.2f, 12.5f, 12.7f) }
+                poly(12.4f, 20.5f, 16.6f, 11.5f, 20.8f, 20.5f)
+                line(14.2f, 17.2f, 19f, 17.2f)
             },
             "com.google.android.apps.translate",
-        ),
-        entry(
-            glyph("tr_b") {
-                poly(3.5f, 16f, 7.5f, 7.5f, 11.5f, 16f)
-                line(5.1f, 13f, 9.9f, 13f)
-                line(16.5f, 6.8f, 16.5f, 9f)
-                line(12.8f, 9f, 20.4f, 9f)
-                line(14.4f, 9f, 18.8f, 16.5f)
-                line(18.6f, 9f, 14.2f, 16.5f)
-            },
-        ),
-        entry(
-            glyph("tr_e") {
-                rect(3.5f, 3.5f, 10.5f, 10.5f, 2.4f)
-                rect(10f, 10f, 10.5f, 10.5f, 2.4f)
-                poly(5.8f, 11.2f, 8.75f, 5.6f, 11.7f, 11.2f)
-                poly(13f, 18.2f, 15.25f, 13.4f, 17.5f, 18.2f)
-            },
         ),
         // Wallet with a card peeking out.
         entry(

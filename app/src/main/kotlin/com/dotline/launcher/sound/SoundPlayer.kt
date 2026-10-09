@@ -11,7 +11,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
@@ -75,6 +77,8 @@ class SoundPlayer(@Suppress("UNUSED_PARAMETER") context: Context) {
     private suspend fun runSound(spec: SoundSpec, mine: Long) {
         try {
             val rendered = Synth.render(spec)
+            // Stopped or replaced while rendering: do not build a track nobody will hear.
+            currentCoroutineContext().ensureActive()
             // Very short clicks are padded with silence: tiny static buffers are rejected on some devices.
             val pcm = if (rendered.size < MIN_SAMPLES) rendered.copyOf(MIN_SAMPLES) else rendered
             val built = buildTrack(pcm)

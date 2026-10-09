@@ -177,7 +177,7 @@ private fun EditPanel(
     onOpenSettings: () -> Unit,
 ) {
     DisposableEffect(metrics) {
-        onDispose { metrics.setPanel(null) }
+        onDispose { metrics.updatePanel(null) }
     }
     Box(
         modifier = Modifier
@@ -190,7 +190,7 @@ private fun EditPanel(
             modifier = Modifier
                 .align(Alignment.TopCenter)
                 .padding(top = HomeDims.ChromeTopGap)
-                .onGloballyPositioned { metrics.setPanel(it.boundsInRoot().toFRect()) },
+                .onGloballyPositioned { metrics.updatePanel(it.boundsInRoot().toFRect()) },
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             ChromePill(text = "Widgets", onClick = onOpenWidgets)

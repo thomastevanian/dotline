@@ -49,6 +49,7 @@ import com.dotline.launcher.ui.home.widgets.BuiltinWidgetView
 import com.dotline.launcher.ui.home.widgets.HostedWidgetView
 import com.dotline.launcher.ui.theme.DotlineTheme
 import com.dotline.launcher.ui.theme.flatClickable
+import kotlin.math.roundToInt
 
 /* ------------------------------------------------------------------------------------------
  * Rendering of the home pages: the icon grid, the dock, the search pill and the page dots.
@@ -69,11 +70,17 @@ internal object HomeDims {
     /** Gap between a widget and the edge of the cells it spans. */
     val WidgetInset: Dp = 3.dp
 
-    /** Horizontal margin of the dock row (4 equal slots). */
-    val DockMargin: Dp = 20.dp
+    /**
+     * Horizontal margin of the dock row (4 equal slots). Equal to the grid margin, so with a 4 column
+     * grid the dock icons sit exactly under the grid columns (as on Nothing OS).
+     */
+    val DockMargin: Dp = GridMargin
 
     /** Space above and below the dock icons. */
     val DockVerticalPad: Dp = 10.dp
+
+    /** Height of the page dots row above the dock. Reserved even with a single page (stable layout). */
+    val DotsRowHeight: Dp = 28.dp
 
     /** Space between the dock row and the search pill, on top of the dock's own padding. */
     val DockToSearchGap: Dp = 14.dp
@@ -111,6 +118,10 @@ internal object HomeDims {
 /** Rounded press area of an icon cell. */
 private val HomeCellShape = RoundedCornerShape(16.dp)
 
+/** Padding between an icon (with its label) and the edge of its press area. */
+private val ItemPadH: Dp = 4.dp
+private val ItemPadV: Dp = 6.dp
+
 /** Compose rect (root pixels) to the plain rect the pure home logic uses. */
 internal fun Rect.toFRect(): FRect = FRect(left, top, right, bottom)
 
@@ -120,13 +131,18 @@ internal class AppIndex(private val byKey: Map<AppKey, AppInfo>) {
     operator fun get(key: AppKey): AppInfo? = byKey[key]
 }
 
-/** Everything an item needs to draw itself and react to a tap. Recreated when any input changes. */
+/**
+ * Everything an item needs to draw itself and react to a tap. Recreated only when the app list, the icon
+ * size or the notification dot source changes: edit mode is read through [isEditing] at click time, so
+ * entering or leaving edit mode never recomposes the icons.
+ */
 @Stable
 internal class HomeRender(
     val apps: AppIndex,
     /** Icon size before the user's icon size setting is applied. */
     val tileBase: Dp,
-    val editMode: Boolean,
+    /** True while the home screen is in edit mode (taps on icons are ignored then). Read in event handlers only. */
+    val isEditing: () -> Boolean,
     /** "package#userSerial" of apps that currently have a notification (always empty unless enabled). */
     val dots: State<Set<String>>,
     val onLaunch: (AppInfo, AndroidRect?) -> Unit,
@@ -137,12 +153,18 @@ internal class HomeRender(
 internal class HomeBounds {
     var coordinates: LayoutCoordinates? = null
 
-    /** Bounds in window pixels, or null while the item is not on screen. Computed on demand only. */
-    fun windowBounds(): AndroidRect? {
+    /**
+     * Bounds of the icon TILE in window pixels (the launch animation grows out of the tile, not out of the
+     * label), or null while the item is not on screen. The measured box is the icon column including its
+     * [topPadPx] padding; the tile is centred in it. Computed on demand only.
+     */
+    fun tileInWindow(tilePx: Float, topPadPx: Float): AndroidRect? {
         val c = coordinates ?: return null
         if (!c.isAttached) return null
         val r = c.boundsInWindow()
-        return AndroidRect(r.left.toInt(), r.top.toInt(), r.right.toInt(), r.bottom.toInt())
+        val left = r.left + (r.width - tilePx) / 2f
+        val top = r.top + topPadPx
+        return AndroidRect(left.roundToInt(), top.roundToInt(), (left + tilePx).roundToInt(), (top + tilePx).roundToInt())
     }
 }
 
@@ -188,9 +210,13 @@ private fun HomeAppItem(
     modifier: Modifier,
 ) {
     val holder = remember { HomeBounds() }
+    val settings = LocalSettings.current
+    val density = LocalDensity.current
     val dotKey = remember(app.key) { NotificationDots.key(app.packageName, app.key.userSerial) }
     val hasDot = render.dots.value.contains(dotKey)
-    val labelVisible = showLabel && LocalSettings.current.showLabels
+    val labelVisible = showLabel && settings.showLabels
+    val tilePx = with(density) { (render.tileBase * settings.iconSize).toPx() }
+    val padTopPx = with(density) { ItemPadV.toPx() }
     val describe: Modifier = if (labelVisible) {
         Modifier
     } else {
@@ -204,10 +230,12 @@ private fun HomeAppItem(
                 .then(describe)
                 .flatClickable(
                     shape = HomeCellShape,
-                    enabled = interactive && !render.editMode,
-                    onClick = { render.onLaunch(app, holder.windowBounds()) },
+                    enabled = interactive,
+                    onClick = {
+                        if (!render.isEditing()) render.onLaunch(app, holder.tileInWindow(tilePx, padTopPx))
+                    },
                 )
-                .padding(horizontal = 4.dp, vertical = 6.dp),
+                .padding(horizontal = ItemPadH, vertical = ItemPadV),
             iconSize = render.tileBase,
             showLabel = showLabel,
             notificationDot = hasDot,
@@ -246,7 +274,7 @@ private fun HomeFolderItem(
                     enabled = interactive,
                     onClick = { render.onOpenFolder(item.id) },
                 )
-                .padding(horizontal = 4.dp, vertical = 6.dp),
+                .padding(horizontal = ItemPadH, vertical = ItemPadV),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             FolderTile(apps = folderApps, size = render.tileBase * settings.iconSize)
@@ -356,14 +384,14 @@ internal fun HomeDockRow(
     modifier: Modifier = Modifier,
 ) {
     DisposableEffect(metrics) {
-        onDispose { metrics.setDock(null) }
+        onDispose { metrics.updateDock(null) }
     }
     Row(
         modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = HomeDims.DockMargin)
             .height(rowHeight)
-            .onGloballyPositioned { metrics.setDock(it.boundsInRoot().toFRect()) },
+            .onGloballyPositioned { metrics.updateDock(it.boundsInRoot().toFRect()) },
         verticalAlignment = Alignment.CenterVertically,
     ) {
         for (slot in 0 until HomeLayout.DOCK_SLOTS) {
@@ -394,7 +422,11 @@ internal fun HomeDockRow(
     }
 }
 
-/** Page dots above the dock. The current page is read here, so paging recomposes only the dots. */
+/**
+ * Page dots above the dock, hidden with a single page. The row keeps its height either way, so adding
+ * or removing a page (e.g. while dragging to a new page) never moves the icon grid. The current page is
+ * read here, so paging recomposes only the dots.
+ */
 @Composable
 internal fun HomePageDots(
     pagerState: PagerState,
@@ -402,14 +434,14 @@ internal fun HomePageDots(
     infinite: Boolean,
     modifier: Modifier = Modifier,
 ) {
-    if (pageCount > 1) {
-        val current = HomeLayoutMath.logicalPage(pagerState.currentPage, pageCount, infinite)
-        Box(
-            modifier = modifier
-                .fillMaxWidth()
-                .padding(vertical = 10.dp),
-            contentAlignment = Alignment.Center,
-        ) {
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(HomeDims.DotsRowHeight),
+        contentAlignment = Alignment.Center,
+    ) {
+        if (pageCount > 1) {
+            val current = HomeLayoutMath.logicalPage(pagerState.currentPage, pageCount, infinite)
             DotPageIndicator(count = pageCount, current = current)
         }
     }

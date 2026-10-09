@@ -21,6 +21,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.input.pointer.pointerInput
@@ -29,6 +30,10 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.LifecycleOwner
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.dotline.launcher.core.CrashLog
 import com.dotline.launcher.service.SystemActions
@@ -56,7 +61,7 @@ import kotlinx.coroutines.withContext
 /** Rows of dots in the waveform strip (odd, so there is a centre row). */
 private const val WAVE_ROWS = 7
 
-/** Outer corner radius of the grouped list, same as the 24dp card shape. */
+/** Outer corner radius of the grouped list: the same 24dp as DotlineTheme.shapes.card. */
 private val GroupCorner = 24.dp
 
 /** The 24-bar amplitude summary of one sound, computed once off the main thread. */
@@ -90,14 +95,15 @@ private fun defaultLabel(category: SoundCategory): String = when (category) {
 /**
  * Sound Studio: preview the built-in synthesised sounds, save them to the Ringtones, Notifications
  * or Alarms folder and optionally make one the system default. Everything is generated on the
- * device; the only permission involved is "Modify system settings", and only for the default step,
- * which is explained before the user is sent to the system screen.
+ * device. The only permission involved is "Modify system settings", and only for the default step;
+ * it is explained first, and the system screen opens only after the user taps Continue.
  */
 @Composable
 fun SoundStudioScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
     BackHandler(onBack = onBack)
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    val lifecycleOwner = LocalLifecycleOwner.current
 
     val player = remember { SoundPlayer(context) }
     DisposableEffect(player) {
@@ -117,6 +123,7 @@ fun SoundStudioScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
     val statuses = remember { mutableStateMapOf<String, String>() }
     var savingId by remember { mutableStateOf<String?>(null) }
     var permissionFor by remember { mutableStateOf<String?>(null) }
+    var awaitingPermission by remember { mutableStateOf<String?>(null) }
 
     // Waveform summaries of the visible category, rendered one by one off the main thread.
     LaunchedEffect(category) {
@@ -158,17 +165,22 @@ fun SoundStudioScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
         }
     }
 
+    // Writes the system setting off the main thread and reports the outcome in the row's status line.
+    val applyDefault: (SoundSpec, Uri) -> Unit = { spec, uri ->
+        scope.launch {
+            val ok = withContext(Dispatchers.IO) {
+                SoundDefaults.setDefault(context, uri, spec.category)
+            }
+            statuses[spec.id] = if (ok) defaultLabel(spec.category) else "Could not set the default sound"
+        }
+    }
+
     val onSetDefault: (SoundSpec) -> Unit = { spec ->
         val uri = savedUris[spec.id]
         if (uri != null) {
             if (SoundDefaults.canSetDefault(context)) {
                 permissionFor = null
-                scope.launch {
-                    val ok = withContext(Dispatchers.IO) {
-                        SoundDefaults.setDefault(context, uri, spec.category)
-                    }
-                    statuses[spec.id] = if (ok) defaultLabel(spec.category) else "Could not set the default sound"
-                }
+                applyDefault(spec, uri)
             } else {
                 // Explain first; the system screen is only opened from the panel's Continue button.
                 permissionFor = spec.id
@@ -180,11 +192,45 @@ fun SoundStudioScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
         permissionFor = null
         try {
             context.startActivity(SystemActions.writeSettings(context))
-            statuses[spec.id] = "Allow Dotline on that screen, then come back and tap Set as default again."
+            awaitingPermission = spec.id
+            statuses[spec.id] = "Allow Dotline on the next screen, then come back."
         } catch (e: Exception) {
             CrashLog.record("SoundStudioScreen: open write settings", e)
             statuses[spec.id] = "Could not open the system settings screen."
         }
+    }
+
+    // Back from the system screen: carry on with the default the user asked for, if it is now allowed.
+    val onReturnFromSettings: () -> Unit = {
+        val id = awaitingPermission
+        if (id != null) {
+            awaitingPermission = null
+            val spec = SoundLibrary.all.firstOrNull { it.id == id }
+            val uri = savedUris[id]
+            if (spec != null && uri != null) {
+                if (SoundDefaults.canSetDefault(context)) {
+                    applyDefault(spec, uri)
+                } else {
+                    statuses[id] = "Permission not granted, so your default sound was not changed."
+                }
+            }
+        }
+    }
+    val latestOnReturn by rememberUpdatedState(onReturnFromSettings)
+
+    // A preview never keeps playing once the launcher is no longer on screen.
+    DisposableEffect(lifecycleOwner, player) {
+        val observer = object : LifecycleEventObserver {
+            override fun onStateChanged(source: LifecycleOwner, event: Lifecycle.Event) {
+                when (event) {
+                    Lifecycle.Event.ON_STOP -> player.stop()
+                    Lifecycle.Event.ON_RESUME -> latestOnReturn()
+                    else -> Unit
+                }
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
     Column(
@@ -199,7 +245,12 @@ fun SoundStudioScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
         CategoryChips(
             selected = category,
             counts = counts,
-            onSelect = { categoryName = it.name },
+            onSelect = { picked ->
+                if (picked != category) {
+                    player.stop()
+                    categoryName = picked.name
+                }
+            },
         )
 
         // A fresh list state per category, so switching category starts at the top.
@@ -299,6 +350,10 @@ private fun CategoryChip(title: String, count: Int, selected: Boolean, onClick: 
     }
 }
 
+/**
+ * One sound. The row that is playing is the inverted one (light fill, dark text), like the selected
+ * row on the Nothing settings pages; everything inside it switches to the matching tokens.
+ */
 @Composable
 private fun SoundRow(
     spec: SoundSpec,
@@ -318,33 +373,49 @@ private fun SoundRow(
     val colors = DotlineTheme.colors
     val type = DotlineTheme.type
     val length = remember(spec.lengthMs) { lengthLabel(spec.lengthMs) }
+
+    val rowFill = if (isPlaying) colors.highlight else colors.card
+    val nameColor = if (isPlaying) colors.onHighlight else colors.primary
+    val subColor = if (isPlaying) colors.onHighlight.copy(alpha = 0.6f) else colors.secondary
+    val waveLit = if (isPlaying) colors.onHighlight else colors.secondary
+    val waveOff = if (isPlaying) colors.onHighlight.copy(alpha = 0.18f) else colors.outline
+    val buttonFill = if (isPlaying) colors.onHighlight else colors.cardRaised
+    val buttonGlyph = if (isPlaying) colors.highlight else colors.primary
+
     Column(
         Modifier
             .fillMaxWidth()
-            .background(colors.card, shape)
+            .background(rowFill, shape)
             .padding(horizontal = 16.dp, vertical = 12.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            PlayButton(playing = isPlaying, name = spec.name, onClick = onTogglePlay)
+            PlayButton(
+                playing = isPlaying,
+                name = spec.name,
+                fill = buttonFill,
+                glyph = buttonGlyph,
+                onClick = onTogglePlay,
+            )
             Spacer(Modifier.width(14.dp))
             Column(Modifier.weight(1f)) {
                 BasicText(
                     text = spec.name,
-                    style = type.body.copy(color = colors.primary),
+                    style = type.body.copy(color = nameColor),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
                 BasicText(
                     text = length,
-                    style = type.caption.copy(color = colors.secondary),
+                    style = type.caption.copy(color = subColor),
                     maxLines = 1,
                 )
                 Spacer(Modifier.height(6.dp))
-                WaveformStrip(bars = bars, active = isPlaying)
+                WaveformStrip(bars = bars, litColor = waveLit, offColor = waveOff)
             }
             Spacer(Modifier.width(12.dp))
+            // The label stays "Save" while saving (the button just dims) so the row never reflows.
             PillButton(
-                text = if (saving) "Saving" else "Save",
+                text = "Save",
                 onClick = onSave,
                 filled = false,
                 enabled = !saving,
@@ -359,16 +430,17 @@ private fun SoundRow(
         if (status != null) {
             BasicText(
                 text = status,
-                style = type.label.copy(color = colors.secondary),
+                style = type.label.copy(color = subColor),
             )
         }
         if (saved && !askPermission) {
             Spacer(Modifier.height(10.dp))
+            // On the inverted (playing) row a light pill would vanish, so it flips to the dark style.
             PillButton(
                 text = "Set as default",
                 onClick = onSetDefault,
                 modifier = Modifier.fillMaxWidth(),
-                filled = true,
+                filled = !isPlaying,
             )
         }
         if (askPermission) {
@@ -378,14 +450,17 @@ private fun SoundRow(
     }
 }
 
-/** Plain explanation shown BEFORE the user is sent to the system "Modify system settings" screen. */
+/**
+ * Plain explanation shown BEFORE the user is sent to the system "Modify system settings" screen.
+ * The two buttons are stacked so neither label can be cut off on a narrow screen or a large font.
+ */
 @Composable
 private fun PermissionPanel(onContinue: () -> Unit, onCancel: () -> Unit) {
     val colors = DotlineTheme.colors
     Column(
         Modifier
             .fillMaxWidth()
-            .background(colors.background, DotlineTheme.shapes.card)
+            .background(colors.background, DotlineTheme.shapes.cardSmall)
             .padding(16.dp),
     ) {
         BasicText(
@@ -394,29 +469,25 @@ private fun PermissionPanel(onContinue: () -> Unit, onCancel: () -> Unit) {
             style = DotlineTheme.type.small.copy(color = colors.primary),
         )
         Spacer(Modifier.height(12.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            PillButton(
-                text = "Continue",
-                onClick = onContinue,
-                modifier = Modifier.weight(1f),
-                filled = true,
-            )
-            PillButton(
-                text = "Cancel",
-                onClick = onCancel,
-                modifier = Modifier.weight(1f),
-                filled = false,
-            )
-        }
+        PillButton(
+            text = "Continue",
+            onClick = onContinue,
+            modifier = Modifier.fillMaxWidth(),
+            filled = true,
+        )
+        Spacer(Modifier.height(8.dp))
+        PillButton(
+            text = "Cancel",
+            onClick = onCancel,
+            modifier = Modifier.fillMaxWidth(),
+            filled = false,
+        )
     }
 }
 
-/** Circular play / stop button. Playing is shown inverted (light fill, dark glyph). */
+/** Circular play / stop button drawn with a Canvas: a triangle, or two bars while playing. */
 @Composable
-private fun PlayButton(playing: Boolean, name: String, onClick: () -> Unit) {
-    val colors = DotlineTheme.colors
-    val fill = if (playing) colors.highlight else colors.cardRaised
-    val glyph = if (playing) colors.onHighlight else colors.primary
+private fun PlayButton(playing: Boolean, name: String, fill: Color, glyph: Color, onClick: () -> Unit) {
     val label = if (playing) "Stop $name" else "Play $name"
     Box(
         Modifier
@@ -456,14 +527,11 @@ private fun PlayButton(playing: Boolean, name: String, onClick: () -> Unit) {
 
 /**
  * Dot-matrix waveform: [WAVEFORM_BARS] columns of [WAVE_ROWS] dots, lit symmetrically around the
- * centre row in proportion to the amplitude of that slice of the sound. Static drawing, nothing
- * animates; the lit dots switch to the primary colour while the sound is playing.
+ * centre row in proportion to the amplitude of that slice of the sound. A static drawing, nothing
+ * animates.
  */
 @Composable
-private fun WaveformStrip(bars: WaveformBars?, active: Boolean, modifier: Modifier = Modifier) {
-    val colors = DotlineTheme.colors
-    val litColor = if (active) colors.primary else colors.secondary
-    val offColor = colors.outline
+private fun WaveformStrip(bars: WaveformBars?, litColor: Color, offColor: Color, modifier: Modifier = Modifier) {
     Canvas(
         modifier
             .fillMaxWidth()
