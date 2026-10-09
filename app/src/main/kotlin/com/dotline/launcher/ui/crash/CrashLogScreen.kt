@@ -104,7 +104,14 @@ fun CrashLogScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
     var copied by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
-        snapshot = withContext(Dispatchers.IO) { loadSnapshot(context) }
+        // An unreadable log must show the empty state, never crash the crash viewer itself.
+        snapshot = withContext(Dispatchers.IO) {
+            try {
+                loadSnapshot(context)
+            } catch (e: Exception) {
+                null
+            }
+        }
         loaded = true
     }
 

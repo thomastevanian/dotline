@@ -447,7 +447,7 @@ internal fun HomeSearchPill(
         SearchIcon(
             modifier = Modifier
                 .align(Alignment.CenterStart)
-                .padding(start = 20.dp)
+                .padding(start = 24.dp)
                 .size(20.dp),
             color = colors.secondary,
         )

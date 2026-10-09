@@ -170,7 +170,7 @@ private fun DesignPage() {
             DottedDivider(Modifier.padding(horizontal = 20.dp))
             BulletRow(title = "Dot-matrix widgets", subtitle = "Clock, date and weather drawn in dots.")
             DottedDivider(Modifier.padding(horizontal = 20.dp))
-            BulletRow(title = "No ads, no tracking", subtitle = "Nothing leaves your phone.")
+            BulletRow(title = "No ads, no tracking", subtitle = "No account. Only the optional weather lookup goes online.")
         }
     }
 }

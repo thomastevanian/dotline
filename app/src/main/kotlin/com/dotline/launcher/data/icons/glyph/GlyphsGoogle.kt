@@ -8,9 +8,9 @@ object GlyphsGoogle {
             glyph("chrome") {
                 circle(12f, 12f, 8.5f)
                 circle(12f, 12f, 3.4f)
-                line(12f, 8.6f, 12f, 3.5f)
-                line(14.94f, 13.7f, 19.36f, 16.25f)
-                line(9.06f, 13.7f, 4.64f, 16.25f)
+                line(12f, 8.6f, 19.79f, 8.6f)
+                line(14.94f, 13.7f, 11.05f, 20.45f)
+                line(9.06f, 13.7f, 5.16f, 6.95f)
             },
             "com.android.chrome", "com.chrome.beta", "com.chrome.dev", "com.chrome.canary", "org.chromium.chrome",
         ),
@@ -83,13 +83,19 @@ object GlyphsGoogle {
             },
             "com.google.android.apps.photos", "com.google.android.apps.photosgo",
         ),
-        // Drive: truncated triangle with a base bar.
+        // Drive: a triangle built from three separate bars.
         entry(
             glyph("google_drive") {
-                poly(8.8f, 4.5f, 15.2f, 4.5f, 20.8f, 14.5f, 17.5f, 19.8f, 6.5f, 19.8f, 3.2f, 14.5f, closed = true)
-                line(3.2f, 14.5f, 20.8f, 14.5f)
+                line(10.4f, 7.07f, 4.9f, 16.63f)
+                line(13.6f, 7.07f, 19.1f, 16.63f)
+                line(6.5f, 19.4f, 17.5f, 19.4f)
             },
             "com.google.android.apps.docs",
+        ),
+        entry(
+            glyph("drive_b") {
+                poly(12f, 4.3f, 20.7f, 19.4f, 3.3f, 19.4f, closed = true)
+            },
         ),
         // Page with a folded corner and text lines.
         entry(
@@ -116,9 +122,9 @@ object GlyphsGoogle {
                     quad(5.5f, 3.5f, 7.5f, 3.5f); close()
                 }
                 poly(13.5f, 3.5f, 13.5f, 8.5f, 18.5f, 8.5f)
-                rect(8.8f, 11.6f, 6.4f, 5.8f, 0.5f)
-                line(12f, 11.6f, 12f, 17.4f)
-                line(8.8f, 14.5f, 15.2f, 14.5f)
+                line(5.5f, 13f, 18.5f, 13f)
+                line(5.5f, 16.8f, 18.5f, 16.8f)
+                line(12f, 13f, 12f, 20.5f)
             },
             "com.google.android.apps.docs.editors.sheets",
         ),
@@ -158,12 +164,30 @@ object GlyphsGoogle {
             glyph("google_translate") {
                 poly(3.5f, 11.5f, 7.5f, 3.5f, 11.5f, 11.5f)
                 line(5.2f, 8.6f, 9.8f, 8.6f)
-                line(16.25f, 11.5f, 16.25f, 13.8f)
-                line(12.5f, 13.8f, 20f, 13.8f)
-                line(14.2f, 13.8f, 18.6f, 20.5f)
-                line(18.6f, 13.8f, 13.8f, 20.5f)
+                line(16.5f, 12.6f, 16.5f, 14.6f)
+                line(13f, 14.6f, 20.2f, 14.6f)
+                line(14.5f, 14.6f, 18.8f, 20.5f)
+                line(18.5f, 14.6f, 14.2f, 20.5f)
             },
             "com.google.android.apps.translate",
+        ),
+        entry(
+            glyph("tr_b") {
+                poly(3.5f, 16f, 7.5f, 7.5f, 11.5f, 16f)
+                line(5.1f, 13f, 9.9f, 13f)
+                line(16.5f, 6.8f, 16.5f, 9f)
+                line(12.8f, 9f, 20.4f, 9f)
+                line(14.4f, 9f, 18.8f, 16.5f)
+                line(18.6f, 9f, 14.2f, 16.5f)
+            },
+        ),
+        entry(
+            glyph("tr_e") {
+                rect(3.5f, 3.5f, 10.5f, 10.5f, 2.4f)
+                rect(10f, 10f, 10.5f, 10.5f, 2.4f)
+                poly(5.8f, 11.2f, 8.75f, 5.6f, 11.7f, 11.2f)
+                poly(13f, 18.2f, 15.25f, 13.4f, 17.5f, 18.2f)
+            },
         ),
         // Wallet with a card peeking out.
         entry(

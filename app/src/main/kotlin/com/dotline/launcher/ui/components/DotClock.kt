@@ -25,11 +25,12 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.dotline.launcher.core.CrashLog
 import com.dotline.launcher.data.ClockStyle
 import com.dotline.launcher.data.TimeFormat
+import com.dotline.launcher.home.WidgetText
 import com.dotline.launcher.ui.LocalSettings
 import com.dotline.launcher.ui.theme.DotlineFonts
 import com.dotline.launcher.ui.theme.DotlineTheme
+import java.time.LocalDate
 import java.time.ZonedDateTime
-import java.time.format.TextStyle as TimeTextStyle
 import java.util.Locale
 import java.util.TimeZone
 
@@ -231,32 +232,35 @@ private fun DotClockNormal(
     }
 }
 
-private fun dotDateLines(now: ZonedDateTime, locale: Locale): Pair<String, String> {
-    val weekday = now.dayOfWeek.getDisplayName(TimeTextStyle.FULL, locale).uppercase(locale)
-    val month = now.month.getDisplayName(TimeTextStyle.SHORT, locale).uppercase(locale)
-    return Pair(weekday, now.dayOfMonth.toString() + " " + month)
-}
+/**
+ * The two date lines. [WidgetText] strips accents and falls back to the English names, because the
+ * 5 x 7 dot font only knows A-Z and digits (a French, German or Japanese phone would otherwise
+ * show "?" glyphs).
+ */
+private fun dotDateLines(date: LocalDate, locale: Locale): Pair<String, String> =
+    Pair(WidgetText.weekdayFull(date, locale), WidgetText.dayMonthShort(date, locale))
 
 /**
  * Dot-matrix date in two left-aligned lines: the weekday (FRIDAY) and then day and month (9 OCT).
- * Draws nothing when the "show date" setting is off.
+ * Very fine text as in the Nothing OS reference: 1.0 dp dots, 1.4 dp pitch (0.4 dp gaps) and the
+ * two lines 18 dp apart (the line gap is 8.6 dots). Draws nothing when "show date" is off.
  */
 @Composable
 fun DotDate(
     now: ZonedDateTime,
     modifier: Modifier = Modifier,
     color: Color = DotlineTheme.colors.secondary,
-    dot: Dp = 2.5.dp,
-    gap: Dp = 1.2.dp,
+    dot: Dp = 1.dp,
+    gap: Dp = 0.4.dp,
 ) {
     val settings = LocalSettings.current
     if (settings.showDate) {
         val locale = Locale.getDefault()
         val today = now.toLocalDate()
-        val lines = remember(today, locale) { dotDateLines(now, locale) }
+        val lines = remember(today, locale) { dotDateLines(today, locale) }
         Column(
             modifier,
-            verticalArrangement = Arrangement.spacedBy(dot * 2f),
+            verticalArrangement = Arrangement.spacedBy(dot * 8.6f),
             horizontalAlignment = Alignment.Start,
         ) {
             DotText(text = lines.first, dot = dot, gap = gap, color = color)

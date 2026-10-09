@@ -9,6 +9,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.dotline.launcher.ui.theme.DotlineTheme
@@ -54,7 +56,8 @@ fun DotText(
     }
     val widthDp = with(density) { metrics.widthPx.toDp() }
     val heightDp = with(density) { metrics.heightPx.toDp() }
-    Canvas(modifier.size(widthDp, heightDp)) {
+    // The dots are only pixels: give screen readers the text itself ("12:34", "FRIDAY").
+    Canvas(modifier.size(widthDp, heightDp).semantics { contentDescription = text }) {
         drawDotString(text, Offset.Zero, metrics, color, offColor)
     }
 }
