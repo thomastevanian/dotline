@@ -1,0 +1,72 @@
+name: Build Dotline
+
+on:
+  push:
+    branches: [main, "claude/**"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Gradle (with cache)
+        uses: gradle/actions/setup-gradle@v6
+
+      - name: Ensure Android SDK packages
+        run: |
+          set +e
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null 2>&1
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-37.0" "build-tools;36.0.0" 2>&1 | tail -5
+          ls "$ANDROID_HOME/platforms" "$ANDROID_HOME/build-tools"
+          exit 0
+
+      - name: Build (release + debug fallback)
+        run: ./gradlew --stacktrace assembleRelease assembleDebug
+
+      - name: Collect APKs
+        run: |
+          mkdir -p dist
+          REL=$(ls app/build/outputs/apk/release/*.apk | head -n1)
+          DBG=$(ls app/build/outputs/apk/debug/*.apk | head -n1)
+          cp "$REL" dist/Dotline.apk
+          cp "$DBG" dist/Dotline-fallback-debug.apk
+          ls -la dist
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --print-certs dist/Dotline.apk | head -5
+
+      - name: Upload APK artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: Dotline-apk
+          path: dist/*.apk
+          if-no-files-found: error
+
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="v1.0.${{ github.run_number }}"
+          cat > release-notes.md <<NOTES
+          **Dotline ${TAG}** — built from commit \`${GITHUB_SHA::7}\` on \`${GITHUB_REF_NAME}\`.
+
+          - **Dotline.apk** — the app (install this one).
+          - **Dotline-fallback-debug.apk** — same app without code shrinking. Only use it if Dotline.apk crashes on launch. Same signature, so it installs over the top without uninstalling.
+
+          Every build is signed with the same key, so you can install any newer APK over the previous one.
+          NOTES
+          gh release create "$TAG" dist/Dotline.apk dist/Dotline-fallback-debug.apk \
+            --target "$GITHUB_SHA" \
+            --title "Dotline $TAG" \
+            --notes-file release-notes.md
