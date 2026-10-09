@@ -222,10 +222,10 @@ private fun FolderPopupContent(
     val shownApps = remember(apps) { apps.distinctBy { app -> app.key.flat } }
 
     var editing by remember { mutableStateOf(false) }
-    var field by remember { mutableStateOf(TextFieldValue(name)) }
+    var nameField by remember { mutableStateOf(TextFieldValue(name)) }
 
     fun commitName() {
-        val trimmed = field.text.trim()
+        val trimmed = nameField.text.trim()
         editing = false
         focusManager.clearFocus()
         if (trimmed.isNotEmpty() && trimmed != name) {
@@ -234,7 +234,7 @@ private fun FolderPopupContent(
     }
 
     fun startEditing() {
-        field = TextFieldValue(text = name, selection = TextRange(name.length))
+        nameField = TextFieldValue(text = name, selection = TextRange(name.length))
         editing = true
     }
 
@@ -301,9 +301,9 @@ private fun FolderPopupContent(
                 FolderNameHeader(
                     name = name,
                     editing = editing,
-                    field = field,
+                    nameField = nameField,
                     onStartEditing = { startEditing() },
-                    onFieldChange = { value: TextFieldValue -> field = clampFolderName(value) },
+                    onFieldChange = { value: TextFieldValue -> nameField = clampFolderName(value) },
                     onDone = { commitName() },
                 )
                 Spacer(Modifier.height(8.dp))
@@ -337,7 +337,7 @@ private fun FolderPopupContent(
 private fun FolderNameHeader(
     name: String,
     editing: Boolean,
-    field: TextFieldValue,
+    nameField: TextFieldValue,
     onStartEditing: () -> Unit,
     onFieldChange: (TextFieldValue) -> Unit,
     onDone: () -> Unit,
@@ -374,7 +374,7 @@ private fun FolderNameHeader(
             }
             CompositionLocalProvider(LocalTextSelectionColors provides selectionColors) {
                 BasicTextField(
-                    value = field,
+                    value = nameField,
                     onValueChange = onFieldChange,
                     modifier = Modifier
                         .fillMaxWidth()
