@@ -48,6 +48,7 @@ import com.dotline.launcher.data.WidgetProviderEntry
 import com.dotline.launcher.data.model.BuiltinWidget
 import com.dotline.launcher.data.model.FolderItem
 import com.dotline.launcher.data.model.HomeLayout
+import com.dotline.launcher.data.model.HostedWidgetItem
 import com.dotline.launcher.data.model.WidgetItem
 import com.dotline.launcher.home.DragSource
 import com.dotline.launcher.home.DropTarget
@@ -431,13 +432,23 @@ internal fun DragPreview(env: HomeEnv, layout: HomeLayout, render: HomeRender, c
                 alpha = DRAG_ALPHA
             },
     ) {
-        HomeItemContent(
-            item = item,
-            render = render,
-            showLabel = fromHome && !inDock,
-            interactive = false,
-            modifier = Modifier.fillMaxSize(),
-        )
+        if (item is HostedWidgetItem) {
+            // A second live app widget view for the same widget id is wasteful: lift a flat card instead.
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(HomeDims.WidgetInset)
+                    .background(DotlineTheme.colors.widget, RoundedCornerShape(20.dp)),
+            )
+        } else {
+            HomeItemContent(
+                item = item,
+                render = render,
+                showLabel = fromHome && !inDock,
+                interactive = false,
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
     }
 }
 
@@ -782,6 +793,12 @@ internal class WidgetFlows(
     )
 
     fun closeNoteEditor() {
+        noteEditorOpen = false
+    }
+
+    /** The Home button: whatever panel is open goes away (nothing is added). */
+    fun closePanels() {
+        calendarPrompt = null
         noteEditorOpen = false
     }
 

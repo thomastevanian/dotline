@@ -5,6 +5,7 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.AnimationSpec
 import androidx.compose.animation.core.AnimationVector1D
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.tween
@@ -19,6 +20,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -52,6 +54,7 @@ import com.dotline.launcher.ui.LocalSettings
 import com.dotline.launcher.ui.home.widgets.LocalWidgetActions
 import com.dotline.launcher.ui.theme.LocalReduceMotion
 import com.dotline.launcher.widgets.WidgetSupport
+import kotlin.math.roundToInt
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -451,9 +454,10 @@ fun HomeRoot(
         }
     }
 
-    LaunchedEffect(graph, controller, pager) {
+    LaunchedEffect(graph, controller, pager, flows) {
         graph.homePressed.collect {
             controller.closeAll()
+            flows.closePanels()
             pager.goToLogical(0, animate = true)
         }
     }
@@ -500,6 +504,18 @@ fun HomeRoot(
             val render = remember(appIndex, iconBase, editMode, dotsState, onLaunch, onOpenFolder) {
                 HomeRender(appIndex, iconBase, editMode, dotsState, onLaunch, onOpenFolder)
             }
+            // While editing or dragging the pages start lower, below the button panel / drop zones.
+            val insetSpec: AnimationSpec<Float> = if (reduceMotion) {
+                snap<Float>()
+            } else {
+                tween<Float>(durationMillis = 150, easing = FastOutSlowInEasing)
+            }
+            val insetFraction = animateFloatAsState(
+                targetValue = if (editMode || slices.dragging) 1f else 0f,
+                animationSpec = insetSpec,
+                label = "editInset",
+            )
+            val insetPx = with(density) { HomeDims.EditInset.toPx() }
 
             Column(
                 modifier = Modifier
@@ -518,6 +534,14 @@ fun HomeRoot(
                     modifier = Modifier
                         .weight(1f)
                         .fillMaxWidth()
+                        .layout { measurable, constraints ->
+                            val inset = (insetPx * insetFraction.value).roundToInt().coerceIn(0, constraints.maxHeight)
+                            val height = constraints.maxHeight - inset
+                            val placeable = measurable.measure(constraints.copy(minHeight = height, maxHeight = height))
+                            layout(constraints.maxWidth, constraints.maxHeight) {
+                                placeable.place(0, inset)
+                            }
+                        }
                         .onGloballyPositioned { metrics.setPageArea(it.boundsInRoot().toFRect()) },
                     beyondViewportPageCount = if (infinite) 1 else pageCount,
                     userScrollEnabled = !slices.dragging,

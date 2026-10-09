@@ -97,7 +97,15 @@ internal object HomeDims {
     val ZoneMargin: Dp = 16.dp
     val ZoneGap: Dp = 8.dp
     val ZoneHeight: Dp = 44.dp
-    val ZoneHitBelow: Dp = 24.dp
+
+    /** The hit area of a drop zone reaches this far below its pill. */
+    val ZoneHitBelow: Dp = 8.dp
+
+    /**
+     * While editing or dragging the icon pages start this far lower (top gap + zone height + hit
+     * margin), so the button panel and the drop zones never sit on top of the first row of icons.
+     */
+    val EditInset: Dp = ChromeTopGap + ZoneHeight + ZoneHitBelow
 }
 
 /** Rounded press area of an icon cell. */

@@ -98,6 +98,7 @@ internal class HomeGestureHost(
 
     /** The home item under a point (dock item or grid item of the current page), or null. */
     fun itemAt(x: Float, y: Float): HitItem? {
+        if (metrics.isOverChrome(x, y)) return null
         val geo = geometry(ZoneSet.NONE) ?: return null
         return HomeLayoutMath.itemAt(geo, layoutProvider(), pager.logicalPage, x, y)
     }
@@ -169,6 +170,7 @@ internal class HomeGestureHost(
             is GestureOutput.SwipeCancelled -> drawer.settle(false)
             is GestureOutput.PinchIn -> {
                 val s = settingsProvider()
+                haptic()
                 actions.perform(s.pinch, s.lockLayout)
             }
             is GestureOutput.DoubleTap -> onDoubleTap()
@@ -184,6 +186,8 @@ internal class HomeGestureHost(
     }
 
     private fun onDoubleTap() {
+        // Only empty space counts: two quick taps on an icon launch it, they never lock the screen.
+        if (itemAt(pointerX, pointerY) != null) return
         val s = settingsProvider()
         actions.perform(s.doubleTap, s.lockLayout)
     }
@@ -246,7 +250,7 @@ internal class HomeGestureHost(
 
     /** An app was long-pressed inside the open folder: lift it out and let the finger carry it. */
     fun beginFolderDrag(folderId: String, app: AppInfo, rootCenter: Offset, rootTopLeft: Offset) {
-        if (settingsProvider().lockLayout) return
+        if (settingsProvider().lockLayout || controller.ui.value.drag != null) return
         val source = DragSource.FromFolder(folderId, app.key)
         val geo = geometry(zonesFor(source)) ?: return
         val halfW = (rootCenter.x - rootTopLeft.x).coerceAtLeast(1f)
@@ -259,7 +263,7 @@ internal class HomeGestureHost(
 
     /** An app is being dragged out of the drawer by the finger at [pointer] (root px). */
     fun beginDrawerDrag(app: AppInfo, pointer: Offset, grab: Offset) {
-        if (settingsProvider().lockLayout) return
+        if (settingsProvider().lockLayout || controller.ui.value.drag != null) return
         val source = DragSource.NewApp(app.key)
         val geo = geometry(zonesFor(source)) ?: return
         controller.beginDrag(source, grab.x, grab.y, pointer.x, pointer.y, geo, pager.logicalPage)
