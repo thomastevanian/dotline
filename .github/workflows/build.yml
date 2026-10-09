@@ -70,15 +70,20 @@ jobs:
           cat errors.txt
           echo "=== END ERRORS ==="
 
-      # The job log is long and noisy, so the same summary is also pushed to a tiny
-      # branch ("ci-logs") that can be read with one cheap file request.
-      - name: Publish error summary to ci-logs
-        if: failure()
+      # The job log is long and noisy, so the result of every run (and the compact error summary
+      # when it failed) is also pushed to a tiny branch ("ci-logs") that can be read cheaply.
+      - name: Publish build status to ci-logs
+        if: always()
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set +e
-          cp errors.txt /tmp/errors.txt
+          {
+            echo "run ${{ github.run_number }} sha ${GITHUB_SHA::7} result ${{ job.status }}"
+            echo "tests: $(cat test-summary.txt 2>/dev/null)"
+            grep -h "FAILED" test.log 2>/dev/null | sort -u | head -30
+            [ -f errors.txt ] && cat errors.txt
+          } > /tmp/status.txt
           rm -rf /tmp/cilogs && mkdir /tmp/cilogs && cd /tmp/cilogs || exit 0
           git init -q
           git remote add origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
@@ -87,9 +92,9 @@ jobs:
           else
             git checkout -q --orphan ci-logs
           fi
-          cp /tmp/errors.txt "errors-${GITHUB_REF_NAME//\//_}.txt"
+          cp /tmp/status.txt "status-${GITHUB_REF_NAME//\//_}.txt"
           git add -A
-          git -c user.name=github-actions -c user.email=actions@github.com commit -q -m "errors for run ${{ github.run_number }}" 
+          git -c user.name=github-actions -c user.email=actions@github.com commit -q -m "status of run ${{ github.run_number }}"
           git push -q origin ci-logs 2>&1 | tail -2
           exit 0
 
