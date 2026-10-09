@@ -23,7 +23,11 @@ import org.json.JSONObject
  * Newest presets come first.
  */
 class WallpaperStore(context: Context, private val scope: CoroutineScope) {
-    private val file = File(context.applicationContext.filesDir, FILE_NAME)
+    private val appContext: Context = context.applicationContext
+
+    // Resolved on first use, which is always on Dispatchers.IO, so the (cheap) directory check
+    // behind Context.getFilesDir() never runs on the thread that creates the store.
+    private val file: File by lazy(LazyThreadSafetyMode.PUBLICATION) { File(appContext.filesDir, FILE_NAME) }
     private val lock = Any()
     private val ioLock = Any()
     private val _presets = MutableStateFlow<List<WallpaperPreset>>(emptyList())

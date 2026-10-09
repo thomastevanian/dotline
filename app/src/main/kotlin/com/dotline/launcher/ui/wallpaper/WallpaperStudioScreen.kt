@@ -262,8 +262,11 @@ fun WallpaperStudioScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
         }
     }
 
+    // Shown as the hint of the name field and used when the field is left empty.
+    val defaultName = "Wallpaper " + (userPresets.size + 1).toString()
+
     fun saveCurrent() {
-        val name = saveName.trim().ifEmpty { "My wallpaper" }
+        val name = saveName.trim().ifEmpty { defaultName }
         graph.wallpapers.save(name, spec)
         saveOpen = false
         focusManager.clearFocus()
@@ -435,7 +438,7 @@ fun WallpaperStudioScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
             ActionBar(
                 status = status,
                 onSave = {
-                    saveName = "Wallpaper " + (userPresets.size + 1).toString()
+                    saveName = ""
                     saveOpen = true
                 },
                 onApply = { applyOpen = true },
@@ -453,6 +456,7 @@ fun WallpaperStudioScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
         if (saveOpen) {
             SaveDialog(
                 name = saveName,
+                hint = defaultName,
                 onNameChange = { text -> saveName = text.take(MAX_NAME) },
                 onSave = { saveCurrent() },
                 onCancel = { saveOpen = false },
@@ -484,6 +488,7 @@ private fun PhonePreview(image: ImageBitmap?, fallback: Color, width: Dp, height
     Box(
         Modifier
             .size(width = width, height = height)
+            .semantics { contentDescription = "Wallpaper preview" }
             .clip(shape)
             .background(fallback)
             .border(1.dp, DotlineTheme.colors.outline, shape),
@@ -910,6 +915,7 @@ private fun DialogCard(
 @Composable
 private fun SaveDialog(
     name: String,
+    hint: String,
     onNameChange: (String) -> Unit,
     onSave: () -> Unit,
     onCancel: () -> Unit,
@@ -931,7 +937,7 @@ private fun SaveDialog(
         PillField(
             value = name,
             onValueChange = onNameChange,
-            hint = "Name",
+            hint = hint,
             onDone = onSave,
             modifier = Modifier.focusRequester(focusRequester),
         )
