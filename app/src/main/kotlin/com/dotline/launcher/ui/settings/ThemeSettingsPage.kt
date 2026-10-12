@@ -58,6 +58,12 @@ fun ThemeSettingsPage(onBack: () -> Unit, modifier: Modifier = Modifier) {
                 selected = s.themeMode,
                 onSelect = { value -> graph.settings.update { it.copy(themeMode = value) } },
             )
+            SwitchRow(
+                title = "Translucent surfaces",
+                subtitle = "Widgets, icons, folders and the search bar let a little of the wallpaper show through. No blur.",
+                checked = s.translucentSurfaces,
+                onCheckedChange = { value -> graph.settings.update { it.copy(translucentSurfaces = value) } },
+            )
         }
 
         SectionLabel("Preview")

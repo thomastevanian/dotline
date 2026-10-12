@@ -78,8 +78,8 @@ private fun WeatherCardBody(
     val kind = if (snapshot != null) snapshot.kind else WeatherKind.UNKNOWN
     val third = when {
         snapshot != null -> WidgetText.dotLine(snapshot.kind.label)
-        error != null -> WidgetText.dotLine(error)
         needsCity -> "SET A CITY"
+        error != null -> WidgetText.dotLine(error)
         else -> "LOADING"
     }.ifEmpty { "--" }
     val lines = remember(today, locale, third) {

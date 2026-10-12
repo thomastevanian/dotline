@@ -53,7 +53,7 @@ fun AppRoot() {
         LocalAppGraph provides graph,
         LocalSettings provides settings,
     ) {
-        DotlineTheme(darkTheme = dark, reduceMotion = reduceMotion) {
+        DotlineTheme(darkTheme = dark, reduceMotion = reduceMotion, translucent = settings.translucentSurfaces) {
             SystemBarIcons(dark)
             if (loaded) {
                 if (!settings.onboardingDone) {

@@ -19,6 +19,7 @@ import com.dotline.launcher.home.WidgetText
 import com.dotline.launcher.ui.LocalSettings
 import com.dotline.launcher.ui.components.ClockDigits
 import com.dotline.launcher.ui.components.DotClock
+import com.dotline.launcher.ui.components.DotText
 import com.dotline.launcher.ui.components.clockDigits
 import com.dotline.launcher.ui.components.rememberNow
 import com.dotline.launcher.ui.theme.DotlineFonts
@@ -36,6 +37,9 @@ import java.util.Locale
 private enum class ClockLayout { INLINE_CARD, STACKED_CARD, CAPSULE }
 
 private const val CLOCK_DATE_GAP = 16f
+
+/** Space between the stacked digits and the date column of the wide card (dp). */
+private const val CLOCK_COLUMN_GAP = 20f
 
 /** The date under the big inline clock is drawn a little larger than the fine default so it reads at arm's length. */
 private const val CLOCK_DATE_SCALE = 1.25f
@@ -91,7 +95,10 @@ private fun ClockWidgetBody(layout: ClockLayout) {
     }
 }
 
-/** 4x2: inline HH:MM sized to the card width, the date in fine dots underneath. */
+/**
+ * 4x2 / 5x2: hours over minutes as big as the card is high on the left (the Nothing look), the date
+ * lines and AM / PM in the column on the right.
+ */
 @Composable
 private fun ClockInlineCard(
     now: ZonedDateTime,
@@ -99,24 +106,45 @@ private fun ClockInlineCard(
     dateLines: List<String>,
     showDate: Boolean,
 ) {
-    val primaryText = DotlineTheme.colors.primary.copy(alpha = 0.78f)
-    val hasAmPm = digits.amPm != null
-    BoxWithConstraints(Modifier.fillMaxSize().padding(16.dp)) {
+    val settings = LocalSettings.current
+    val colors = DotlineTheme.colors
+    BoxWithConstraints(Modifier.fillMaxSize().padding(horizontal = 22.dp, vertical = 18.dp)) {
         val availW = maxWidth.value
         val availH = maxHeight.value
-        val dateBlock = if (showDate) WidgetFit.fineLinesHeight(2, CLOCK_DATE_SCALE) + CLOCK_DATE_GAP else 0f
-        val clockH = availH - dateBlock
-        val dot = WidgetFit.clockInlineDot(availW, clockH, hasAmPm, 14f)
-        val normalSize = WidgetFit.normalClockFontSize(availW, clockH, false, hasAmPm, 110f)
-        Column(
-            modifier = Modifier.fillMaxSize(),
-            verticalArrangement = Arrangement.Center,
-            horizontalAlignment = Alignment.Start,
-        ) {
-            ClockFace(now = now, digits = digits, stacked = false, dot = dot, normalSize = normalSize)
-            if (showDate) {
-                Spacer(Modifier.height(CLOCK_DATE_GAP.dp))
-                WidgetFineLines(lines = dateLines, scale = CLOCK_DATE_SCALE, color = primaryText)
+        val dot = WidgetFit.clockStackedDot(availW * 0.55f, availH, false, 16f)
+        val gap = dot * WidgetFit.CLOCK_GAP_RATIO
+        val stackW = WidgetFit.dotTextWidth(2, dot, gap)
+        val restW = (availW - stackW - CLOCK_COLUMN_GAP).coerceAtLeast(0f)
+        val dateScale = if (showDate && restW > 0f) {
+            (restW / WidgetFit.fineLinesWidth(WidgetText.longest(dateLines), 1f)).coerceIn(0.8f, CLOCK_DATE_SCALE)
+        } else {
+            1f
+        }
+        Row(Modifier.fillMaxSize(), verticalAlignment = Alignment.CenterVertically) {
+            if (settings.clockStyle == ClockStyle.DOT) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    DotText(text = digits.hours, dot = dot.dp, gap = gap.dp, color = colors.primary)
+                    Spacer(Modifier.height((dot * 2f).dp))
+                    DotText(text = digits.minutes, dot = dot.dp, gap = gap.dp, color = colors.primary)
+                }
+            } else {
+                ClockNormalText(
+                    digits = digits.copy(amPm = null),
+                    stacked = true,
+                    fontSizeDp = WidgetFit.normalClockFontSize(availW * 0.5f, availH, true, false, 120f),
+                    color = colors.primary,
+                )
+            }
+            Spacer(Modifier.width(CLOCK_COLUMN_GAP.dp))
+            Column(Modifier.weight(1f)) {
+                if (showDate) {
+                    WidgetFineLines(lines = dateLines, scale = dateScale, color = colors.primary.copy(alpha = 0.78f))
+                }
+                val amPm = digits.amPm
+                if (amPm != null) {
+                    Spacer(Modifier.height(16.dp))
+                    DotText(text = amPm, dot = 3.dp, gap = 1.dp, color = colors.secondary)
+                }
             }
         }
     }

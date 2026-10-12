@@ -103,6 +103,31 @@ val LightColors = DotlineColors(
     searchPill = Color(0xFFFFFFFF),
 )
 
+/**
+ * The same palette with the home screen surfaces (widgets, icon tiles, folder tiles, the search pill)
+ * made partly see-through, so the wallpaper shows faintly behind them. Still flat: no blur, no gradient.
+ * Settings cards and text keep their solid colours.
+ */
+fun DotlineColors.translucent(): DotlineColors = DotlineColors(
+    isDark = isDark,
+    background = background,
+    primary = primary,
+    secondary = secondary,
+    tertiary = tertiary,
+    outline = outline,
+    card = card,
+    cardRaised = cardRaised,
+    highlight = highlight,
+    onHighlight = onHighlight,
+    accent = accent,
+    iconTile = iconTile.copy(alpha = 0.72f),
+    pressOverlay = pressOverlay,
+    scrim = scrim,
+    folderTile = folderTile.copy(alpha = 0.66f),
+    widget = widget.copy(alpha = 0.70f),
+    searchPill = searchPill.copy(alpha = 0.62f),
+)
+
 object DotlineFonts {
     /** Dot-matrix display face (Doto, OFL) - nearest open match to Nothing's Ndot. */
     val Doto = FontFamily(
@@ -168,9 +193,13 @@ object DotlineTheme {
 fun DotlineTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
     reduceMotion: Boolean = false,
+    translucent: Boolean = false,
     content: @Composable () -> Unit,
 ) {
-    val colors = if (darkTheme) DarkColors else LightColors
+    val colors = remember(darkTheme, translucent) {
+        val base = if (darkTheme) DarkColors else LightColors
+        if (translucent) base.translucent() else base
+    }
     val typography = remember { DotlineTypography() }
     val shapes = remember { DotlineShapes() }
     CompositionLocalProvider(

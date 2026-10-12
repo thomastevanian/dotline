@@ -16,6 +16,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.input.pointer.pointerInput
@@ -25,12 +26,14 @@ import androidx.core.graphics.drawable.toBitmap
 import com.dotline.launcher.core.CrashLog
 import com.dotline.launcher.data.WidgetProviderEntry
 import com.dotline.launcher.data.model.BuiltinWidget
+import com.dotline.launcher.data.model.Placement
+import com.dotline.launcher.data.model.WidgetItem
 import com.dotline.launcher.home.WidgetHostMath
 import com.dotline.launcher.home.WidgetSizes
 import com.dotline.launcher.ui.LocalAppGraph
 import com.dotline.launcher.ui.components.ScreenHeader
 import com.dotline.launcher.ui.components.SectionLabel
-import com.dotline.launcher.ui.home.widgets.widgetShapeFor
+import com.dotline.launcher.ui.home.widgets.BuiltinWidgetView
 import com.dotline.launcher.ui.theme.DotlineTheme
 import com.dotline.launcher.ui.theme.flatClickable
 import kotlinx.coroutines.Dispatchers
@@ -40,7 +43,6 @@ import kotlinx.coroutines.withContext
 private const val PREVIEW_MAX_PX = 320
 
 private val PreviewShape = RoundedCornerShape(12.dp)
-private val ChipShape = RoundedCornerShape(12.dp)
 
 /**
  * Flat full-screen widget picker: Dotline's own widgets first (one chip per size), then every
@@ -89,7 +91,12 @@ internal fun WidgetPicker(
         ) {
             item(key = "label-dotline") { SectionLabel("Dotline") }
             items(BuiltinWidget.entries, key = { kind -> "builtin-" + kind.name }) { kind ->
-                BuiltinWidgetCard(kind = kind, onPick = onPickBuiltin)
+                BuiltinWidgetCard(
+                    kind = kind,
+                    cellWidthDp = cellWidthDp,
+                    cellHeightDp = cellHeightDp,
+                    onPick = onPickBuiltin,
+                )
             }
             item(key = "label-apps") { SectionLabel("App widgets") }
             val loaded = groups
@@ -133,8 +140,16 @@ private fun PickerNote(text: String) {
     )
 }
 
+/** How much smaller than life the live widget previews are drawn. */
+private const val PREVIEW_SCALE = 0.36f
+
 @Composable
-private fun BuiltinWidgetCard(kind: BuiltinWidget, onPick: (BuiltinWidget, Int, Int) -> Unit) {
+private fun BuiltinWidgetCard(
+    kind: BuiltinWidget,
+    cellWidthDp: Float,
+    cellHeightDp: Float,
+    onPick: (BuiltinWidget, Int, Int) -> Unit,
+) {
     val colors = DotlineTheme.colors
     val type = DotlineTheme.type
     Column(
@@ -145,32 +160,63 @@ private fun BuiltinWidgetCard(kind: BuiltinWidget, onPick: (BuiltinWidget, Int, 
     ) {
         BasicText(text = WidgetSizes.title(kind), style = type.bodyMedium.copy(color = colors.primary))
         Spacer(Modifier.height(12.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        // The previews sit on a lighter strip so the dark widgets stand out from the card.
+        FlowRow(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(colors.cardRaised, RoundedCornerShape(16.dp))
+                .padding(12.dp),
+            horizontalArrangement = Arrangement.spacedBy(14.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
             for (size in WidgetSizes.supported(kind)) {
-                SizeChip(spanX = size.first, spanY = size.second, onClick = { onPick(kind, size.first, size.second) })
+                WidgetPreview(
+                    kind = kind,
+                    spanX = size.first,
+                    spanY = size.second,
+                    cellWidthDp = cellWidthDp,
+                    cellHeightDp = cellHeightDp,
+                    onClick = { onPick(kind, size.first, size.second) },
+                )
             }
         }
     }
 }
 
-/** A tappable size option: a tiny outline of the widget shape above "4 x 2". */
+/**
+ * A tappable, live miniature of a built-in widget at one size: the real widget is composed at its full
+ * size and scaled down, with a transparent layer on top that takes the tap, then "4 x 2" underneath.
+ */
 @Composable
-private fun SizeChip(spanX: Int, spanY: Int, onClick: () -> Unit) {
+private fun WidgetPreview(
+    kind: BuiltinWidget,
+    spanX: Int,
+    spanY: Int,
+    cellWidthDp: Float,
+    cellHeightDp: Float,
+    onClick: () -> Unit,
+) {
     val colors = DotlineTheme.colors
-    val shape = widgetShapeFor(WidgetSizes.shapeFor(spanX, spanY))
-    Column(
-        modifier = Modifier
-            .background(colors.cardRaised, ChipShape)
-            .flatClickable(ChipShape, onClick = onClick)
-            .padding(horizontal = 12.dp, vertical = 10.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Box(
-            modifier = Modifier
-                .size(width = (spanX * 11).dp, height = (spanY * 13).dp)
-                .border(1.dp, colors.secondary, shape),
-        )
-        Spacer(Modifier.height(8.dp))
+    val fullW = (cellWidthDp * spanX).dp
+    val fullH = (cellHeightDp * spanY).dp
+    val item = remember(kind, spanX, spanY) {
+        WidgetItem("preview-" + kind.name + "-" + spanX + "x" + spanY, kind, Placement(0, 0, spanX, spanY))
+    }
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Box(modifier = Modifier.size(fullW * PREVIEW_SCALE, fullH * PREVIEW_SCALE)) {
+            Box(
+                modifier = Modifier
+                    .requiredSize(fullW, fullH)
+                    .graphicsLayer {
+                        scaleX = PREVIEW_SCALE
+                        scaleY = PREVIEW_SCALE
+                    },
+            ) {
+                BuiltinWidgetView(item = item, modifier = Modifier.fillMaxSize())
+            }
+            Box(modifier = Modifier.matchParentSize().flatClickable(PreviewShape, onClick = onClick))
+        }
+        Spacer(Modifier.height(6.dp))
         BasicText(
             text = "$spanX x $spanY",
             style = DotlineTheme.type.caption.copy(color = colors.secondary),

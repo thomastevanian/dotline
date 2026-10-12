@@ -25,7 +25,7 @@ PY
   say "shot $1"
 }
 
-tap_text() { # exact text or content-description; optional 2nd arg "last" = top-most match
+tap_text() { # exact text/content-description (or its first line / first comma part); 2nd arg: first | last | top
   adb shell uiautomator dump /sdcard/ui.xml > /dev/null 2>&1
   adb pull /sdcard/ui.xml raw/ui.xml > /dev/null 2>&1
   local xy
@@ -37,13 +37,22 @@ try:
     root = ET.parse("raw/ui.xml").getroot()
 except Exception:
     sys.exit(0)
+def match(v):
+    if not v:
+        return False
+    return v == t or v.split("\n")[0] == t or v.split(", ")[0] == t
 hits = []
 for n in root.iter("node"):
-    if n.get("text") == t or n.get("content-desc") == t:
+    if match(n.get("text")) or match(n.get("content-desc")):
         b = list(map(int, re.findall(r"\d+", n.get("bounds"))))
         hits.append(((b[0] + b[2]) // 2, (b[1] + b[3]) // 2))
 if hits:
-    x, y = hits[-1] if mode == "last" else hits[0]
+    if mode == "last":
+        x, y = hits[-1]
+    elif mode == "top":
+        x, y = min(hits, key=lambda h: h[1])
+    else:
+        x, y = hits[0]
     print(x, y)
 PY
 )
@@ -52,7 +61,21 @@ PY
     say "tapped '$1' at $xy"
     return 0
   fi
-  say "WARN: '$1' not found"
+  say "WARN: '$1' not found; on screen: $(python3 - <<'PY'
+import xml.etree.ElementTree as ET
+try:
+    root = ET.parse("raw/ui.xml").getroot()
+    seen = []
+    for n in root.iter("node"):
+        for k in ("text", "content-desc"):
+            v = (n.get(k) or "").replace("\n", " / ")
+            if v and v not in seen:
+                seen.append(v)
+    print(" | ".join(seen[:25]))
+except Exception as e:
+    print("(no ui dump)")
+PY
+)"
   return 1
 }
 
@@ -84,29 +107,49 @@ swipe 540 2050 540 700 260 && shot 08_drawer 2
 adb shell input tap 540 2250 && sleep 1 && adb shell input text "c" && shot 09_drawer_search 1.5
 back; sleep 0.5; back; sleep 1; home; sleep 1
 
-# 4. App menu (long press an icon), then remove that icon so its cell is empty, then long press
-#    the empty cell: that is how edit mode opens. Then the widget picker.
+# 4. A folder: drop one icon on another (long press, drag), look at it closed and open.
 home; sleep 1
+adb shell input draganddrop 135 1120 337 1120 1500
+shot 10_folder_created 2
+adb shell input tap 135 1120
+shot 11_folder_open 1.5
+back; sleep 1; home; sleep 1
+
+# 5. App menu (long press an icon), then remove that icon so its cell is empty: a long press on an
+#    empty cell opens edit mode. Then the widget picker.
 adb shell input swipe 540 1100 540 1100 900
-shot 10_app_menu 1.5
+shot 12_app_menu 1.5
 tap_text "Remove from home"; sleep 1
 adb shell input swipe 540 1100 540 1100 900
-shot 11_edit_mode 1.5
-tap_text "Widgets" last && shot 12_widget_picker 2
+shot 13_edit_mode 1.5
+tap_text "Widgets" top && shot 14_widget_picker 2.5
+swipe 540 1800 540 700 300 && shot 15_widget_picker_scrolled 1.5
+back; sleep 1; back; sleep 1
+
+# 6. Settings and its pages.
+open_settings() { home; sleep 1; adb shell input swipe 540 1100 540 1100 900; sleep 1; tap_text "Settings" top; sleep 1.5; }
+open_settings
+shot 16_settings 1
+for page in "Home" "Icons" "Clock and widgets" "Drawer" "Gestures" "Theme" "Wallpapers" "Sounds" "Finish the look" "Backup and restore" "About"; do
+  tap_text "$page" || { swipe 540 1800 540 700 300; sleep 0.8; tap_text "$page"; } 
+  name=$(echo "$page" | tr 'A-Z ' 'a-z_')
+  shot "17_$name" 1.5
+  back; sleep 0.8
+done
 back; sleep 1
 
-# 5. Settings and its pages (opened from edit mode, like a real user would).
-tap_text "Settings" last && shot 13_settings 2
-for page in "Home" "Icons" "Clock and widgets" "Drawer" "Gestures" "Theme" "Backup and restore" "About"; do
-  if tap_text "$page"; then
-    name=$(echo "$page" | tr 'A-Z ' 'a-z_')
-    shot "14_settings_$name" 1.2
-    back; sleep 0.8
-  fi
-done
-tap_text "Sounds" && shot 15_sound_studio 2 && back && sleep 1
-tap_text "Finish the look" && shot 16_finish_the_look 2 && back && sleep 1
-tap_text "Wallpapers" && shot 17_wallpaper_studio 2.5 && back && sleep 1
+# 7. Look variants: translucent surfaces, then light mode on top of it.
+open_settings
+tap_text "Theme" && tap_text "Translucent surfaces" && sleep 1 && shot 18_theme_translucent 1
+back; sleep 0.6; back; sleep 1.2
+shot 19_home_translucent 2
+swipe 900 1300 150 1300 250 && shot 20_home_translucent_page2 1.5
+open_settings
+tap_text "Theme" && tap_text "Light" && sleep 1 && shot 21_theme_light 1
+back; sleep 0.6; back; sleep 1.2
+shot 22_home_light 2
+swipe 150 1300 900 1300 250 && shot 23_home_light_page1 1.5
+tap_text "Search" ; sleep 1.5; shot 24_drawer_light 1
 
 # 6. Diagnostics.
 home; sleep 1

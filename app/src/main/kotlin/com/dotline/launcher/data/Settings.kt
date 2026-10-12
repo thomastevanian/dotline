@@ -64,6 +64,8 @@ data class Settings(
 
     // Theme
     val themeMode: ThemeMode = ThemeMode.DARK,
+    /** Widgets, icon tiles, folders and the search pill let a little of the wallpaper through (no blur). */
+    val translucentSurfaces: Boolean = false,
 
     // App state
     val onboardingDone: Boolean = false,
@@ -112,6 +114,7 @@ object SettingsJson {
         put("pinch", s.pinch.name)
         put("doubleTap", s.doubleTap.name)
         put("themeMode", s.themeMode.name)
+        put("translucentSurfaces", s.translucentSurfaces)
         put("onboardingDone", s.onboardingDone)
         put("homePagesSeeded", s.homePagesSeeded)
         put("defaultHomePrompted", s.defaultHomePrompted)
@@ -156,6 +159,7 @@ object SettingsJson {
             pinch = o.enum("pinch", d.pinch),
             doubleTap = o.enum("doubleTap", d.doubleTap),
             themeMode = o.enum("themeMode", d.themeMode),
+            translucentSurfaces = o.optBoolean("translucentSurfaces", d.translucentSurfaces),
             onboardingDone = o.optBoolean("onboardingDone", d.onboardingDone),
             homePagesSeeded = o.optBoolean("homePagesSeeded", d.homePagesSeeded),
             defaultHomePrompted = o.optBoolean("defaultHomePrompted", d.defaultHomePrompted),
