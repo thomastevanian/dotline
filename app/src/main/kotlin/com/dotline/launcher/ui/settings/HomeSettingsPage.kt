@@ -16,11 +16,14 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.dotline.launcher.data.DefaultLayout
+import com.dotline.launcher.data.LayoutIds
 import com.dotline.launcher.ui.LocalAppGraph
 import com.dotline.launcher.ui.LocalSettings
 import com.dotline.launcher.ui.components.PillButton
 import com.dotline.launcher.ui.components.SectionLabel
 import com.dotline.launcher.ui.components.SettingsCard
+import com.dotline.launcher.ui.components.SettingsRow
 import com.dotline.launcher.ui.theme.DotlineTheme
 import kotlinx.coroutines.delay
 import kotlin.math.roundToInt
@@ -97,6 +100,26 @@ fun HomeSettingsPage(onBack: () -> Unit, modifier: Modifier = Modifier) {
             )
         }
         InfoNote("A black layer over the wallpaper, so labels stay easy to read on bright pictures.")
+
+        SectionLabel("Reset")
+        var confirmReset by remember { mutableStateOf(false) }
+        SettingsCard {
+            SettingsRow(
+                title = if (confirmReset) "Tap again to reset" else "Reset home screen layout",
+                subtitle = "Rebuilds the clock page, the widgets page and the app pages. Your settings are kept.",
+                highlighted = confirmReset,
+                onClick = {
+                    if (!confirmReset) {
+                        confirmReset = true
+                    } else {
+                        confirmReset = false
+                        graph.layout.replace(
+                            DefaultLayout.build(graph.apps.apps.value, s.gridColumns, s.gridRows, LayoutIds::newId),
+                        )
+                    }
+                },
+            )
+        }
     }
 }
 

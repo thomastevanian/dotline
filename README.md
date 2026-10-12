@@ -16,7 +16,7 @@ location.
 
 | Area | What you get |
 | --- | --- |
-| Home screen | 5 x 6 grid (4 x 5 up to 6 x 7), up to 7 pages, 4-app dock without a panel, dot page indicators, home search pill, edit mode, drag and drop between pages / dock / folders, folders with 2 x 2 mini icons, uninstall by dragging |
+| Home screen | 5 x 6 grid (4 x 5 up to 6 x 7), up to 7 pages (three out of the box: clock page, widgets page, more apps; swipe left and right), 4-app dock without a panel, dot page indicators, home search pill, edit mode, drag and drop between pages / dock / folders, folders with 2 x 2 mini icons, uninstall by dragging |
 | Widgets | Dot-matrix clock, date, weather, battery, next calendar event, world clock (2 cities), quick note. Circle, capsule and card shapes. Any normal Android app widget can be added too |
 | Icons | Monochrome Nothing-style icons (white glyph on a black circle), 60+ hand-drawn original glyphs, automatic silhouettes for everything else, original icons, accent mode, circle or rounded square, size and label options, third-party icon packs, opt-in notification dots |
 | App drawer | Swipe up, search as you type, A-Z scroller with floating letter, long-press menu with app shortcuts, hide apps (optional fingerprint lock), optional recents row |
@@ -27,7 +27,7 @@ location.
 
 ## Status
 
-Every push is compiled, shrunk with R8, signed and unit-tested by GitHub Actions (230 unit tests cover the layout
+Every push is compiled, shrunk with R8, signed and unit-tested by GitHub Actions (232 unit tests cover the layout
 engine, drag and drop rules, gestures, drawer search, weather parsing, backup, wallpaper generation and sound
 synthesis). The screens themselves have been built from reference screenshots of Nothing OS 5.0 but have not yet been
 checked on every phone, so if something looks off or crashes, open **Settings > About > Crash log** and send what it
@@ -133,6 +133,14 @@ There is no need for Android Studio. To build locally anyway:
 
 Doto, Space Mono and Space Grotesk are bundled under the SIL Open Font License 1.1 (see `licenses/`). Doto is
 the nearest open-source match to Nothing's dot-matrix typeface.
+
+## Seeing the app without a phone (screenshots)
+
+The **Screenshots** workflow (`.github/workflows/screens.yml`) boots an Android 14 emulator at 1080 x 2400 on GitHub
+Actions, installs the debug build, drives the launcher with real swipes and taps (intro, home pages, drawer and search,
+folders, edit mode, widget picker, every settings page, light and translucent looks) and publishes the screenshots to the
+`ci-shots` branch. It also installs the previous release first and upgrades it in place, to prove that an existing layout
+keeps working. Run it from the Actions tab, or put `[shots]` in a commit message on a `claude/**` branch.
 
 ## Project layout
 
