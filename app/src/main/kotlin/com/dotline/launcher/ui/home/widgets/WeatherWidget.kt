@@ -111,9 +111,9 @@ private fun WeatherCardBody(
                 if (askForCity) {
                     // No city yet: a dot-matrix map pin and the call to action (the whole card is tappable).
                     Column(horizontalAlignment = Alignment.End) {
-                        DotMatrixIcon(rows = PinRows, pitch = 4.dp, color = colors.primary)
+                        DotMatrixIcon(rows = PinRows, pitch = 6.dp, color = colors.primary)
                         Spacer(Modifier.height(12.dp))
-                        DotText(text = "SET CITY", dot = 3.dp, gap = 1.dp, color = colors.secondary)
+                        DotText(text = "SET CITY", dot = 2.dp, gap = 1.dp, color = colors.secondary)
                     }
                     return@Row
                 }

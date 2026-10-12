@@ -112,11 +112,12 @@ back; sleep 0.5; back; sleep 1; home; sleep 1
 home; sleep 1
 touch() { adb shell input motionevent "$1" "$2" "$3"; }
 touch DOWN 135 1120; sleep 1.4
-for x in 175 215 255 295 337; do touch MOVE $x 1120; sleep 0.12; done
+# the pages shift down while dragging, so the middle of the target cell is lower than where it rests
+for x in 175 215 255 295 337; do touch MOVE $x 1210; sleep 0.12; done
 # a real finger is never perfectly still: small moves keep the hover timer running
-for i in 1 2 3 4 5 6 7 8; do touch MOVE $((337 + (i % 2) * 3)) 1120; sleep 0.15; done
+for i in 1 2 3 4 5 6 7 8; do touch MOVE $((337 + (i % 2) * 3)) 1210; sleep 0.15; done
 shot 10a_folder_hover 0
-touch UP 337 1120; sleep 1.8
+touch UP 337 1210; sleep 1.8
 shot 10_folder_created 0.5
 adb shell input tap 337 1120
 shot 11_folder_open 1.5
@@ -157,6 +158,24 @@ back; sleep 0.6; back; sleep 1.2
 shot 22_home_light 2
 swipe 150 1300 900 1300 250 && shot 23_home_light_page1 1.5
 tap_text "Search" ; sleep 1.5; shot 24_drawer_light 1
+
+# 8. The upgrade path: the build that is on your phone (a single home page), updated in place.
+if [ -f old.apk ]; then
+  say "--- upgrade test ---"
+  adb uninstall $PKG > /dev/null 2>&1
+  adb install -g old.apk > /dev/null && say "installed the previous release"
+  adb shell cmd role add-role-holder android.app.role.HOME $PKG > /dev/null 2>&1
+  home; sleep 3
+  tap_text "Skip"
+  shot 30_old_home 6
+  swipe 900 1300 150 1300 250 && shot 31_old_swipe_left 1.5
+  adb install -r -d "$APK" > /dev/null && say "upgraded in place"
+  adb shell am force-stop $PKG
+  home
+  shot 32_upgraded_home 7
+  swipe 900 1300 150 1300 250 && shot 33_upgraded_swipe_left 1.5
+  swipe 900 1300 150 1300 250 && shot 34_upgraded_swipe_left_again 1.5
+fi
 
 # 6. Diagnostics.
 home; sleep 1
