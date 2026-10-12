@@ -13,6 +13,7 @@ import android.graphics.drawable.Drawable
 import android.os.Build
 import com.dotline.launcher.data.IconShape
 import com.dotline.launcher.data.IconStyle
+import com.dotline.launcher.ui.components.DotFont
 import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
@@ -39,15 +40,25 @@ object IconProcessor {
 
     private const val ROUNDED_SQUARE_RADIUS = 0.28f
 
+    /** Silhouettes filling at least this share of their bounding box count as blobs (a disc fills 0.785). */
+    private const val BLOB_FILL = 0.74f
+
+    /** Passed to [process] when the app's initial is unknown. */
+    const val NO_INITIAL = '\u0000'
+
     private val NEUTRAL_TILE: Int = 0xFF2A2A2A.toInt()
     private val NEUTRAL_RING: Int = 0xFFCFCFCF.toInt()
 
-    /** Slight gamma on source alpha: keeps edges soft but suppresses faint shadows and halos. */
+    /** Source alpha below this is treated as noise: it removes the faint drop-shadow plates some foregrounds carry. */
+    private const val NOISE_FLOOR = 44
+
+    /** Slight gamma on source alpha above [NOISE_FLOOR]: keeps edges soft but suppresses faint shadows and halos. */
     private val ALPHA_LUT: IntArray = IntArray(256) { i ->
-        if (i < 6) {
+        if (i < NOISE_FLOOR) {
             0
         } else {
-            val v = (255.0 * (i / 255.0).pow(1.2) + 0.5).toInt()
+            val t = (i - NOISE_FLOOR) / (255.0 - NOISE_FLOOR)
+            val v = (255.0 * t.pow(0.9) + 0.5).toInt()
             if (v < 0) 0 else if (v > 255) 255 else v
         }
     }
@@ -56,16 +67,16 @@ object IconProcessor {
      * Renders [drawable] according to [request]. Never throws for ordinary drawable problems: a null,
      * zero-size, empty or failing drawable produces a generic ring glyph so no app is ever blank.
      */
-    fun process(drawable: Drawable?, request: IconRequest): Bitmap {
+    fun process(drawable: Drawable?, request: IconRequest, initial: Char = NO_INITIAL): Bitmap {
         val size = max(1, request.sizePx)
         val result = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(result)
         try {
-            drawStyle(canvas, drawable, size, request)
+            drawStyle(canvas, drawable, size, request, initial)
         } catch (e: Exception) {
             result.eraseColor(0)
             try {
-                drawStyle(canvas, null, size, request)
+                drawStyle(canvas, null, size, request, initial)
             } catch (e2: Exception) {
                 // Leave the bitmap transparent; nothing more can be done.
             }
@@ -73,11 +84,11 @@ object IconProcessor {
         return result
     }
 
-    private fun drawStyle(canvas: Canvas, drawable: Drawable?, size: Int, request: IconRequest) {
+    private fun drawStyle(canvas: Canvas, drawable: Drawable?, size: Int, request: IconRequest, initial: Char) {
         when (request.style) {
             IconStyle.ORIGINAL -> drawOriginal(canvas, drawable, size, request)
-            IconStyle.MONOCHROME -> drawMonochrome(canvas, drawable, size, request, request.glyphColor)
-            IconStyle.MONOCHROME_ACCENT -> drawMonochrome(canvas, drawable, size, request, request.accentColor)
+            IconStyle.MONOCHROME -> drawMonochrome(canvas, drawable, size, request, request.glyphColor, initial)
+            IconStyle.MONOCHROME_ACCENT -> drawMonochrome(canvas, drawable, size, request, request.accentColor, initial)
         }
     }
 
@@ -159,16 +170,72 @@ object IconProcessor {
     // MONOCHROME / MONOCHROME_ACCENT: tile + silhouette glyph
     // ---------------------------------------------------------------------------------------------
 
-    private fun drawMonochrome(canvas: Canvas, drawable: Drawable?, size: Int, request: IconRequest, tint: Int) {
+    private fun drawMonochrome(canvas: Canvas, drawable: Drawable?, size: Int, request: IconRequest, tint: Int, initial: Char) {
         if (!request.glyphOnly) {
             drawTile(canvas, size, request)
         }
         val glyph = buildGlyph(drawable, size, request.glyphOnly, tint)
-        if (glyph != null) {
+        val canShowInitial = initial in 'A'..'Z' || initial in '0'..'9'
+        if (glyph != null && !(canShowInitial && isBlob(glyph, size))) {
             canvas.drawBitmap(glyph, 0f, 0f, Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG))
             glyph.recycle()
         } else {
-            drawRing(canvas, size, if (request.glyphOnly) 0.60f else 0.42f, tint)
+            glyph?.recycle()
+            if (canShowInitial) {
+                drawInitial(canvas, size, initial, request.glyphOnly, tint)
+            } else {
+                drawRing(canvas, size, if (request.glyphOnly) 0.60f else 0.42f, tint)
+            }
+        }
+    }
+
+    /**
+     * True when the silhouette is a plain filled disc or square (a white blob tells the user nothing):
+     * its visible pixels fill most of their own bounding box. Outlines and detailed shapes fill much less.
+     */
+    private fun isBlob(glyph: Bitmap, size: Int): Boolean {
+        val px = IntArray(size * size)
+        glyph.getPixels(px, 0, size, 0, 0, size, size)
+        var minX = size
+        var minY = size
+        var maxX = -1
+        var maxY = -1
+        var count = 0
+        for (y in 0 until size) {
+            for (x in 0 until size) {
+                if ((px[y * size + x] ushr 24) > 128) {
+                    count++
+                    if (x < minX) minX = x
+                    if (x > maxX) maxX = x
+                    if (y < minY) minY = y
+                    if (y > maxY) maxY = y
+                }
+            }
+        }
+        if (count == 0 || maxX < minX) return false
+        val boxW = maxX - minX + 1
+        val boxH = maxY - minY + 1
+        if (boxW < size * 0.3f || boxH < size * 0.3f) return false
+        return count.toFloat() / (boxW.toFloat() * boxH.toFloat()) >= BLOB_FILL
+    }
+
+    /** The app's first letter as a 5 x 7 dot-matrix character: lit dots in the tint, unlit dots barely visible. */
+    private fun drawInitial(canvas: Canvas, size: Int, initial: Char, glyphOnly: Boolean, tint: Int) {
+        val rows = DotFont.rows(initial)
+        val s = size.toFloat()
+        val block = s * (if (glyphOnly) 0.62f else 0.46f)
+        val cell = block / DotFont.ROWS
+        val left = (s - cell * DotFont.COLS) / 2f
+        val top = (s - block) / 2f
+        val radius = cell * 0.36f
+        val lit = newPaint(tint, Paint.Style.FILL, 0f)
+        val dim = newPaint((tint and 0x00FFFFFF) or (0x2A shl 24), Paint.Style.FILL, 0f)
+        for (row in 0 until DotFont.ROWS) {
+            for (col in 0 until DotFont.COLS) {
+                val cx = left + (col + 0.5f) * cell
+                val cy = top + (row + 0.5f) * cell
+                canvas.drawCircle(cx, cy, radius, if (DotFont.isOn(rows, row, col)) lit else dim)
+            }
         }
     }
 

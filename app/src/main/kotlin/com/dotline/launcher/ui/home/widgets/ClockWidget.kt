@@ -35,7 +35,10 @@ import java.util.Locale
 
 private enum class ClockLayout { INLINE_CARD, STACKED_CARD, CAPSULE }
 
-private const val CLOCK_DATE_GAP = 14f
+private const val CLOCK_DATE_GAP = 16f
+
+/** The date under the big inline clock is drawn a little larger than the fine default so it reads at arm's length. */
+private const val CLOCK_DATE_SCALE = 1.25f
 private const val CLOCK_CAPSULE_DATE_MIN_WIDTH = 200f
 
 @Composable
@@ -96,15 +99,15 @@ private fun ClockInlineCard(
     dateLines: List<String>,
     showDate: Boolean,
 ) {
-    val secondary = DotlineTheme.colors.secondary
+    val primaryText = DotlineTheme.colors.primary.copy(alpha = 0.78f)
     val hasAmPm = digits.amPm != null
     BoxWithConstraints(Modifier.fillMaxSize().padding(16.dp)) {
         val availW = maxWidth.value
         val availH = maxHeight.value
-        val dateBlock = if (showDate) WidgetFit.fineLinesHeight(2, 1f) + CLOCK_DATE_GAP else 0f
+        val dateBlock = if (showDate) WidgetFit.fineLinesHeight(2, CLOCK_DATE_SCALE) + CLOCK_DATE_GAP else 0f
         val clockH = availH - dateBlock
-        val dot = WidgetFit.clockInlineDot(availW, clockH, hasAmPm, 9f)
-        val normalSize = WidgetFit.normalClockFontSize(availW, clockH, false, hasAmPm, 96f)
+        val dot = WidgetFit.clockInlineDot(availW, clockH, hasAmPm, 14f)
+        val normalSize = WidgetFit.normalClockFontSize(availW, clockH, false, hasAmPm, 110f)
         Column(
             modifier = Modifier.fillMaxSize(),
             verticalArrangement = Arrangement.Center,
@@ -113,7 +116,7 @@ private fun ClockInlineCard(
             ClockFace(now = now, digits = digits, stacked = false, dot = dot, normalSize = normalSize)
             if (showDate) {
                 Spacer(Modifier.height(CLOCK_DATE_GAP.dp))
-                WidgetFineLines(lines = dateLines, scale = 1f, color = secondary)
+                WidgetFineLines(lines = dateLines, scale = CLOCK_DATE_SCALE, color = primaryText)
             }
         }
     }

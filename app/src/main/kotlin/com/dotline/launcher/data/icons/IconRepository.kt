@@ -57,7 +57,7 @@ data class IconRequest(
 )
 
 /** Bump when [IconProcessor] output changes so stale disk entries are never reused. */
-private const val PROCESSOR_VERSION = 1
+private const val PROCESSOR_VERSION = 2
 
 private const val MEMORY_CAP_BYTES = 24 * 1024 * 1024
 private const val DISK_CAP_BYTES = 40L * 1024L * 1024L
@@ -183,6 +183,7 @@ class IconRepository(
     }
 
     private suspend fun render(app: AppInfo, request: IconRequest): Bitmap = withContext(Dispatchers.Default) {
+        val initial = app.label.firstOrNull { it.isLetterOrDigit() }?.uppercaseChar() ?: IconProcessor.NO_INITIAL
         var drawable: Drawable? = null
         try {
             drawable = loadDrawable(app, request)
@@ -190,13 +191,13 @@ class IconRepository(
             logFailure("IconRepository.loadDrawable ${app.key.flat}", e)
         }
         try {
-            IconProcessor.process(drawable, request)
+            IconProcessor.process(drawable, request, initial)
         } catch (e: OutOfMemoryError) {
             memory.evictAll()
-            IconProcessor.process(null, request)
+            IconProcessor.process(null, request, initial)
         } catch (e: Exception) {
             logFailure("IconRepository.process ${app.key.flat}", e)
-            IconProcessor.process(null, request)
+            IconProcessor.process(null, request, initial)
         }
     }
 

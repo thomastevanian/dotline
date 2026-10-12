@@ -67,8 +67,8 @@ object DefaultLayout {
         for (a in ordered) {
             val next = LayoutEngine.addToFirstFree(layout, AppItem(newId(), a.key, Placement(0, 0)), cols, rows) ?: break
             layout = next
-            // Keep the first-run page tidy: the preferred apps only, the rest live in the drawer.
-            if (layout.pages.size > 1 || layout.pages[0].size >= 1 + cols * 2) break
+            // First page: the clock card plus a full block of apps under it; the rest go on the later pages.
+            if (layout.pages.size > 1 || layout.pages[0].size >= 1 + cols * (rows - clockRows)) break
         }
         return LayoutEngine.normalize(withExtraPages(layout, apps, emptySet(), cols, rows, newId), cols, rows)
     }

@@ -33,6 +33,10 @@ import java.util.Locale
 
 private val WeatherDegreeRows: List<String> = listOf(".#.", "#.#", ".#.")
 
+/** Cards at least this big (dp) get the two-column layout. */
+private const val WIDE_CARD_MIN_WIDTH = 280f
+private const val WIDE_CARD_MIN_HEIGHT = 120f
+
 @Composable
 fun WeatherWidget(spanX: Int, spanY: Int, modifier: Modifier = Modifier) {
     val shape = WidgetSizes.shapeFor(spanX, spanY)
@@ -75,7 +79,7 @@ private fun WeatherCardBody(
     val third = when {
         snapshot != null -> WidgetText.dotLine(snapshot.kind.label)
         error != null -> WidgetText.dotLine(error)
-        needsCity -> "SET CITY IN SETTINGS"
+        needsCity -> "SET A CITY"
         else -> "LOADING"
     }.ifEmpty { "--" }
     val lines = remember(today, locale, third) {
@@ -83,6 +87,30 @@ private fun WeatherCardBody(
     }
     val temp = if (snapshot != null) WeatherFormat.convert(snapshot.tempC, tempUnit).toString() else "--"
     BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+        if (maxWidth.value >= WIDE_CARD_MIN_WIDTH && maxHeight.value >= WIDE_CARD_MIN_HEIGHT) {
+            // A wide card (the 5 x 2 on the widgets page): the date and condition on the left, the
+            // temperature and its pictogram large on the right, instead of tiny text in a big box.
+            Row(
+                modifier = Modifier.fillMaxSize().padding(horizontal = 22.dp, vertical = 18.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    WidgetFineLines(lines = lines, scale = 1.25f, color = colors.primary)
+                }
+                Column(horizontalAlignment = Alignment.End) {
+                    WeatherDotIcon(kind = kind, pitch = 3.5f.dp, color = colors.primary)
+                    Spacer(Modifier.height(10.dp))
+                    Row(verticalAlignment = Alignment.Top) {
+                        DotText(text = temp, dot = 6.dp, gap = 2.dp, color = colors.primary)
+                        if (snapshot != null) {
+                            Spacer(Modifier.width(3.dp))
+                            DotMatrixIcon(rows = WeatherDegreeRows, pitch = 2.5f.dp, color = colors.primary)
+                        }
+                    }
+                }
+            }
+            return@BoxWithConstraints
+        }
         val s = WidgetFit.weatherCardScale(WidgetText.longest(lines), maxWidth.value, maxHeight.value)
         val lineHeight = WidgetFit.dotTextHeight(WidgetFit.FINE_DOT * s, WidgetFit.FINE_GAP * s)
         val spacing = (WidgetFit.FINE_LINE_PITCH * s - lineHeight).coerceAtLeast(0f)

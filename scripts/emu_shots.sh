@@ -25,23 +25,26 @@ PY
   say "shot $1"
 }
 
-tap_text() { # exact text or content-description
+tap_text() { # exact text or content-description; optional 2nd arg "last" = top-most match
   adb shell uiautomator dump /sdcard/ui.xml > /dev/null 2>&1
   adb pull /sdcard/ui.xml raw/ui.xml > /dev/null 2>&1
   local xy
-  xy=$(python3 - "$1" <<'PY'
+  xy=$(python3 - "$1" "${2:-first}" <<'PY'
 import re, sys
 import xml.etree.ElementTree as ET
-t = sys.argv[1]
+t, mode = sys.argv[1], sys.argv[2]
 try:
     root = ET.parse("raw/ui.xml").getroot()
 except Exception:
     sys.exit(0)
+hits = []
 for n in root.iter("node"):
     if n.get("text") == t or n.get("content-desc") == t:
         b = list(map(int, re.findall(r"\d+", n.get("bounds"))))
-        print((b[0] + b[2]) // 2, (b[1] + b[3]) // 2)
-        break
+        hits.append(((b[0] + b[2]) // 2, (b[1] + b[3]) // 2))
+if hits:
+    x, y = hits[-1] if mode == "last" else hits[0]
+    print(x, y)
 PY
 )
   if [ -n "$xy" ]; then
@@ -76,28 +79,34 @@ swipe 900 1300 150 1300 250 && shot 06_home_swipe_left_again 1.5
 swipe 150 1300 900 1300 250 && swipe 150 1300 900 1300 250 && shot 07_home_swipe_back 1.5
 
 # 3. Drawer and search.
+home; sleep 1
 swipe 540 2050 540 700 260 && shot 08_drawer 2
-tap_text "Search" && sleep 1 && adb shell input text "c" && shot 09_drawer_search 1.5
-back; back; home; sleep 1
+adb shell input tap 540 2250 && sleep 1 && adb shell input text "c" && shot 09_drawer_search 1.5
+back; sleep 0.5; back; sleep 1; home; sleep 1
 
-# 4. Edit mode, widget picker.
-adb shell input swipe 540 1250 540 1250 900
-shot 10_edit_mode 1.5
-tap_text "Widgets" && shot 11_widget_picker 2
+# 4. App menu (long press an icon), then remove that icon so its cell is empty, then long press
+#    the empty cell: that is how edit mode opens. Then the widget picker.
+home; sleep 1
+adb shell input swipe 540 1100 540 1100 900
+shot 10_app_menu 1.5
+tap_text "Remove from home"; sleep 1
+adb shell input swipe 540 1100 540 1100 900
+shot 11_edit_mode 1.5
+tap_text "Widgets" last && shot 12_widget_picker 2
 back; sleep 1
 
-# 5. Settings and its pages.
-tap_text "Settings" && shot 12_settings 2
+# 5. Settings and its pages (opened from edit mode, like a real user would).
+tap_text "Settings" last && shot 13_settings 2
 for page in "Home" "Icons" "Clock and widgets" "Drawer" "Gestures" "Theme" "Backup and restore" "About"; do
   if tap_text "$page"; then
     name=$(echo "$page" | tr 'A-Z ' 'a-z_')
-    shot "13_settings_$name" 1.2
+    shot "14_settings_$name" 1.2
     back; sleep 0.8
   fi
 done
-tap_text "Sounds" && shot 14_sound_studio 2 && back && sleep 1
-tap_text "Finish the look" && shot 15_finish_the_look 2 && back && sleep 1
-tap_text "Wallpapers" && shot 16_wallpaper_studio 2.5 && back && sleep 1
+tap_text "Sounds" && shot 15_sound_studio 2 && back && sleep 1
+tap_text "Finish the look" && shot 16_finish_the_look 2 && back && sleep 1
+tap_text "Wallpapers" && shot 17_wallpaper_studio 2.5 && back && sleep 1
 
 # 6. Diagnostics.
 home; sleep 1
