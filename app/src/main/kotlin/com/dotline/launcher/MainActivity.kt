@@ -24,6 +24,11 @@ class MainActivity : FragmentActivity() {
             override fun handleOnBackPressed() = Unit
         })
 
+        // Debug builds only (used by the CI screenshot run): skip the intro when asked to.
+        if (BuildConfig.DEBUG && intent.getBooleanExtra("dotline.skip_onboarding", false)) {
+            graph.settings.update { it.copy(onboardingDone = true) }
+        }
+
         setContent { AppRoot() }
     }
 
