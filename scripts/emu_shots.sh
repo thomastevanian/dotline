@@ -68,9 +68,8 @@ shot 01_onboarding_1 4
 tap_text "Next" && shot 02_onboarding_2 1.2
 tap_text "Next" && shot 03_onboarding_3 1.2
 
-# 2. Skip the intro (debug-only extra) and look at the home screen.
-adb shell am force-stop $PKG
-adb shell am start -n $PKG/.MainActivity --ez dotline.skip_onboarding true > /dev/null
+# 2. Skip the intro (the same button a real user taps) and look at the home screen.
+tap_text "Skip"
 shot 04_home_page1 5
 swipe 900 1300 150 1300 250 && shot 05_home_swipe_left 1.5
 swipe 900 1300 150 1300 250 && shot 06_home_swipe_left_again 1.5

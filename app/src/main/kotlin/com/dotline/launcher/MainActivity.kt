@@ -6,10 +6,7 @@ import androidx.activity.OnBackPressedCallback
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.fragment.app.FragmentActivity
-import androidx.lifecycle.lifecycleScope
 import com.dotline.launcher.ui.AppRoot
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.launch
 
 /**
  * The one and only activity. Registered as MAIN + HOME + DEFAULT (+ LAUNCHER so it can also be
@@ -26,15 +23,6 @@ class MainActivity : FragmentActivity() {
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() = Unit
         })
-
-        // Debug builds only (used by the CI screenshot run): skip the intro when asked to.
-        if (BuildConfig.DEBUG && intent.getBooleanExtra("dotline.skip_onboarding", false)) {
-            lifecycleScope.launch {
-                // Wait for the stored settings first, or they would overwrite this change when they load.
-                graph.settings.loaded.first { it }
-                graph.settings.update { it.copy(onboardingDone = true) }
-            }
-        }
 
         setContent { AppRoot() }
     }
