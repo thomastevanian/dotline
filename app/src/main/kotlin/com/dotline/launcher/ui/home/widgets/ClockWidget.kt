@@ -43,6 +43,9 @@ private const val CLOCK_COLUMN_GAP = 20f
 
 /** The date under the big inline clock is drawn a little larger than the fine default so it reads at arm's length. */
 private const val CLOCK_DATE_SCALE = 1.25f
+
+/** In the wide card the date may grow to this much, so it fills the column beside the stacked digits. */
+private const val CLOCK_DATE_MAX_SCALE = 1.7f
 private const val CLOCK_CAPSULE_DATE_MIN_WIDTH = 200f
 
 @Composable
@@ -116,7 +119,7 @@ private fun ClockInlineCard(
         val stackW = WidgetFit.dotTextWidth(2, dot, gap)
         val restW = (availW - stackW - CLOCK_COLUMN_GAP).coerceAtLeast(0f)
         val dateScale = if (showDate && restW > 0f) {
-            (restW / WidgetFit.fineLinesWidth(WidgetText.longest(dateLines), 1f)).coerceIn(0.8f, CLOCK_DATE_SCALE)
+            (restW / WidgetFit.fineLinesWidth(WidgetText.longest(dateLines), 1f)).coerceIn(0.8f, CLOCK_DATE_MAX_SCALE)
         } else {
             1f
         }
@@ -136,14 +139,14 @@ private fun ClockInlineCard(
                 )
             }
             Spacer(Modifier.width(CLOCK_COLUMN_GAP.dp))
-            Column(Modifier.weight(1f)) {
+            Column(Modifier.weight(1f), horizontalAlignment = Alignment.End) {
                 if (showDate) {
                     WidgetFineLines(lines = dateLines, scale = dateScale, color = colors.primary.copy(alpha = 0.78f))
                 }
                 val amPm = digits.amPm
                 if (amPm != null) {
                     Spacer(Modifier.height(16.dp))
-                    DotText(text = amPm, dot = 3.dp, gap = 1.dp, color = colors.secondary)
+                    DotText(text = amPm, dot = 4.dp, gap = 1.dp, color = colors.secondary)
                 }
             }
         }

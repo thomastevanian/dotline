@@ -175,7 +175,9 @@ fun WallpaperStudioScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
     val userPresets by graph.wallpapers.presets.collectAsStateWithLifecycle()
 
     // The working spec lives as JSON text so it survives rotation and process death.
-    var specJson by rememberSaveable { mutableStateOf(WallpaperSpecJson.toJsonString(WallpaperSpec())) }
+    var specJson by rememberSaveable {
+        mutableStateOf(WallpaperSpecJson.toJsonString(com.dotline.launcher.wallpaper.WallpaperPresets.all.first { it.id == "grad_radial" }.spec))
+    }
     val spec: WallpaperSpec = remember(specJson) { WallpaperSpecJson.fromJsonString(specJson) ?: WallpaperSpec() }
 
     var saveOpen by rememberSaveable { mutableStateOf(false) }

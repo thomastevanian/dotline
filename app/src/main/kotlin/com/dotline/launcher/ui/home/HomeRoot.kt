@@ -50,7 +50,11 @@ import com.dotline.launcher.service.NotificationDots
 import com.dotline.launcher.ui.LocalAppGraph
 import com.dotline.launcher.ui.LocalSettings
 import com.dotline.launcher.ui.home.widgets.LocalWidgetActions
+import com.dotline.launcher.ui.theme.LocalOnWallpaper
 import com.dotline.launcher.ui.theme.LocalReduceMotion
+import com.dotline.launcher.ui.theme.inkOnWallpaper
+import com.dotline.launcher.ui.theme.rememberWallpaperIsLight
+import com.dotline.launcher.ui.LocalSystemBarStyle
 import com.dotline.launcher.widgets.WidgetSupport
 import kotlin.math.roundToInt
 import kotlinx.coroutines.CoroutineScope
@@ -330,6 +334,7 @@ fun HomeRoot(
     onOpenSettings: () -> Unit,
     onOpenWallpaperStudio: () -> Unit,
     modifier: Modifier = Modifier,
+    onOpenWeatherSettings: () -> Unit = {},
 ) {
     val graph = LocalAppGraph.current
     val settings = LocalSettings.current
@@ -361,6 +366,15 @@ fun HomeRoot(
     val metrics = remember { HomeMetrics() }
     metrics.density = density.density
     val actions = remember(context, graph, controller) { HomeActions(context, graph, controller) }
+    actions.onOpenWeatherSettings = onOpenWeatherSettings
+
+    // Labels and the status bar adapt to the wallpaper: dark ink on a light one, white on a dark one.
+    val wallpaperLight = rememberWallpaperIsLight()
+    val barStyle = LocalSystemBarStyle.current
+    val coveredByOpaqueScreen = slices.drawerOpen || slices.pickerOpen
+    LaunchedEffect(wallpaperLight, coveredByOpaqueScreen) {
+        barStyle.homeDarkIcons = wallpaperLight && !coveredByOpaqueScreen
+    }
 
     // ---- pager ------------------------------------------------------------------------------
 
@@ -503,7 +517,10 @@ fun HomeRoot(
         }
     }
 
-    CompositionLocalProvider(LocalWidgetActions provides flows.widgetActions) {
+    CompositionLocalProvider(
+        LocalWidgetActions provides flows.widgetActions,
+        LocalOnWallpaper provides inkOnWallpaper(wallpaperLight),
+    ) {
         // The root Box sits at the origin of the composition and fills the screen: pointer positions
         // seen by the gesture handler are root coordinates, the same space as every measured rect.
         BoxWithConstraints(

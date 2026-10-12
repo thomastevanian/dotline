@@ -61,6 +61,7 @@ class WidgetActions(
     val openClockApp: () -> Unit = {},
     val openCalendarApp: () -> Unit = {},
     val editNote: () -> Unit = {},
+    val openWeatherSettings: () -> Unit = {},
 )
 
 val LocalWidgetActions = staticCompositionLocalOf { WidgetActions() }

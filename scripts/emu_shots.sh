@@ -107,11 +107,17 @@ swipe 540 2050 540 700 260 && shot 08_drawer 2
 adb shell input tap 540 2250 && sleep 1 && adb shell input text "c" && shot 09_drawer_search 1.5
 back; sleep 0.5; back; sleep 1; home; sleep 1
 
-# 4. A folder: drop one icon on another (long press, drag), look at it closed and open.
+# 4. A folder: press and hold an icon, drag it over another, hold there (that is what makes a folder),
+#    release. Raw touch events, because a plain drag gesture releases before the hover pause.
 home; sleep 1
-adb shell input draganddrop 135 1120 337 1120 1500
-shot 10_folder_created 2
-adb shell input tap 135 1120
+touch() { adb shell input motionevent "$1" "$2" "$3"; }
+touch DOWN 135 1120; sleep 1.4
+for x in 175 215 255 295 337; do touch MOVE $x 1120; sleep 0.12; done
+sleep 1.3
+shot 10a_folder_hover 0
+touch UP 337 1120; sleep 1.8
+shot 10_folder_created 0.5
+adb shell input tap 337 1120
 shot 11_folder_open 1.5
 back; sleep 1; home; sleep 1
 

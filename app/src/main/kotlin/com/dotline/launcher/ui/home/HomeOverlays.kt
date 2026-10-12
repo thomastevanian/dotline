@@ -821,6 +821,7 @@ internal class WidgetFlows(
         openClockApp = { actions.openClockApp() },
         openCalendarApp = { actions.openCalendarApp() },
         editNote = { noteEditorOpen = true },
+        openWeatherSettings = { actions.onOpenWeatherSettings() },
     )
 
     fun closeNoteEditor() {

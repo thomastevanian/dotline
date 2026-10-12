@@ -49,6 +49,7 @@ import com.dotline.launcher.ui.home.widgets.BuiltinWidgetView
 import com.dotline.launcher.ui.home.widgets.HostedWidgetView
 import com.dotline.launcher.ui.theme.DotlineTheme
 import com.dotline.launcher.ui.theme.flatClickable
+import com.dotline.launcher.ui.theme.onWallpaperColor
 import kotlin.math.roundToInt
 
 /* ------------------------------------------------------------------------------------------
@@ -225,6 +226,7 @@ private fun HomeAppItem(
     Box(modifier = modifier, contentAlignment = Alignment.Center) {
         AppIconView(
             app = app,
+            labelColor = onWallpaperColor(),
             modifier = Modifier
                 .onGloballyPositioned { holder.coordinates = it }
                 .then(describe)
@@ -255,8 +257,9 @@ private fun HomeFolderItem(
     val colors = DotlineTheme.colors
     val folderApps = remember(item.apps, render.apps) { item.apps.mapNotNull { render.apps[it] } }
     val baseStyle = DotlineTheme.type.iconLabel
-    val labelStyle = remember(baseStyle, colors.primary) {
-        baseStyle.copy(color = colors.primary, textAlign = TextAlign.Center)
+    val inkOnWallpaper = onWallpaperColor()
+    val labelStyle = remember(baseStyle, inkOnWallpaper) {
+        baseStyle.copy(color = inkOnWallpaper, textAlign = TextAlign.Center)
     }
     val labelVisible = showLabel && settings.showLabels
     val describe: Modifier = if (labelVisible) {
@@ -442,7 +445,8 @@ internal fun HomePageDots(
     ) {
         if (pageCount > 1) {
             val current = HomeLayoutMath.logicalPage(pagerState.currentPage, pageCount, infinite)
-            DotPageIndicator(count = pageCount, current = current)
+            val ink = onWallpaperColor()
+            DotPageIndicator(count = pageCount, current = current, activeColor = ink, inactiveColor = ink.copy(alpha = 0.42f))
         }
     }
 }

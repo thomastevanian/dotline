@@ -54,8 +54,9 @@ fun SettingsScreen(
     onOpenSoundStudio: () -> Unit,
     onOpenSetupGuide: () -> Unit,
     modifier: Modifier = Modifier,
+    initialPage: String = PAGE_ROOT,
 ) {
-    var page by rememberSaveable { mutableStateOf(PAGE_ROOT) }
+    var page by rememberSaveable { mutableStateOf(initialPage) }
     val backToRoot: () -> Unit = { page = PAGE_ROOT }
 
     Box(

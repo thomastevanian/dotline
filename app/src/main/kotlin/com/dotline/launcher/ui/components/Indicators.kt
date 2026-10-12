@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.dotline.launcher.ui.theme.DotlineTheme
 import kotlin.math.PI
@@ -51,9 +52,13 @@ fun DottedDivider(modifier: Modifier = Modifier) {
  * the others use the tertiary colour.
  */
 @Composable
-fun DotPageIndicator(count: Int, current: Int, modifier: Modifier = Modifier) {
-    val activeColor = DotlineTheme.colors.primary
-    val inactiveColor = DotlineTheme.colors.tertiary
+fun DotPageIndicator(
+    count: Int,
+    current: Int,
+    modifier: Modifier = Modifier,
+    activeColor: Color = DotlineTheme.colors.primary,
+    inactiveColor: Color = DotlineTheme.colors.tertiary,
+) {
     val safeCount = if (count < 0) 0 else count
     val pitch = 14.dp
     Canvas(modifier.size(pitch * safeCount, 8.dp)) {

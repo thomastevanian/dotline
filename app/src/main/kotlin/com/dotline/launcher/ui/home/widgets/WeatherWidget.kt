@@ -53,7 +53,7 @@ fun WeatherWidget(spanX: Int, spanY: Int, modifier: Modifier = Modifier) {
     } else {
         "Weather, no data"
     }
-    WidgetSurface(shape = shape, modifier = modifier) {
+    val body: @Composable BoxScope.() -> Unit = {
         Box(modifier = Modifier.fillMaxSize().widgetDescription(spoken)) {
             when (shape) {
                 WidgetShape.CARD -> WeatherCardBody(snapshot, error, needsCity, tempUnit)
@@ -61,6 +61,12 @@ fun WeatherWidget(spanX: Int, spanY: Int, modifier: Modifier = Modifier) {
                 WidgetShape.CIRCLE -> WeatherCircleBody(snapshot, tempUnit)
             }
         }
+    }
+    if (needsCity) {
+        // Nothing to show yet: tapping the card goes straight to where the city is set.
+        ClickableWidgetSurface(shape = shape, onClick = LocalWidgetActions.current.openWeatherSettings, modifier = modifier, content = body)
+    } else {
+        WidgetSurface(shape = shape, modifier = modifier, content = body)
     }
 }
 

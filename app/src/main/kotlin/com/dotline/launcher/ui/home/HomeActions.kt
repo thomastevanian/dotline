@@ -28,6 +28,9 @@ internal class HomeActions(
     private val graph: AppGraph,
     private val controller: HomeController,
 ) {
+    /** Set by the home screen: opens Settings on the clock and widgets page (where the city is chosen). */
+    var onOpenWeatherSettings: () -> Unit = {}
+
     fun toast(message: String) {
         Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
     }

@@ -49,17 +49,19 @@ fun AppRoot() {
     }
     val reduceMotion = rememberReduceMotion()
 
+    val barStyle = remember { SystemBarStyle() }
     CompositionLocalProvider(
         LocalAppGraph provides graph,
         LocalSettings provides settings,
+        LocalSystemBarStyle provides barStyle,
     ) {
         DotlineTheme(darkTheme = dark, reduceMotion = reduceMotion, translucent = settings.translucentSurfaces) {
-            SystemBarIcons(dark)
             if (loaded) {
                 if (!settings.onboardingDone) {
+                    SystemBarIcons(darkIcons = !dark)
                     OnboardingScreen(onFinished = { graph.settings.update { it.copy(onboardingDone = true) } })
                 } else {
-                    Navigator()
+                    Navigator(dark)
                 }
             }
         }
@@ -67,10 +69,15 @@ fun AppRoot() {
 }
 
 @Composable
-private fun Navigator() {
+private fun Navigator(dark: Boolean) {
     var stack by rememberSaveable { mutableStateOf(Screen.HOME.name) }
+    var settingsStart by rememberSaveable { mutableStateOf("root") }
     val screens = stack.split(',').mapNotNull { n -> Screen.entries.firstOrNull { it.name == n } }.ifEmpty { listOf(Screen.HOME) }
     val current = screens.last()
+
+    // The home screen picks dark or light icons to suit the wallpaper; every other screen follows the theme.
+    val homeDarkIcons = LocalSystemBarStyle.current.homeDarkIcons
+    SystemBarIcons(darkIcons = if (current == Screen.HOME) homeDarkIcons ?: false else !dark)
 
     fun push(s: Screen) { stack = (screens + s).joinToString(",") { it.name } }
     fun pop() { if (screens.size > 1) stack = screens.dropLast(1).joinToString(",") { it.name } }
@@ -83,12 +90,14 @@ private fun Navigator() {
 
     // Home stays composed underneath so its state (page, scroll) is kept.
     HomeRoot(
-        onOpenSettings = { push(Screen.SETTINGS) },
+        onOpenSettings = { settingsStart = "root"; push(Screen.SETTINGS) },
         onOpenWallpaperStudio = { push(Screen.WALLPAPER) },
+        onOpenWeatherSettings = { settingsStart = "clock"; push(Screen.SETTINGS) },
     )
     when (current) {
         Screen.HOME -> Unit
         Screen.SETTINGS -> SettingsScreen(
+            initialPage = settingsStart,
             onBack = { pop() },
             onOpenCrashLog = { push(Screen.CRASH_LOG) },
             onOpenWallpaperStudio = { push(Screen.WALLPAPER) },
@@ -104,14 +113,14 @@ private fun Navigator() {
 
 /** Status/navigation bar icon contrast follows the app theme. */
 @Composable
-private fun SystemBarIcons(dark: Boolean) {
+private fun SystemBarIcons(darkIcons: Boolean) {
     val view = LocalView.current
     if (!view.isInEditMode) {
         SideEffect {
             val window = (view.context as? Activity)?.window ?: return@SideEffect
             val controller = WindowCompat.getInsetsController(window, view)
-            controller.isAppearanceLightStatusBars = !dark
-            controller.isAppearanceLightNavigationBars = !dark
+            controller.isAppearanceLightStatusBars = darkIcons
+            controller.isAppearanceLightNavigationBars = darkIcons
         }
     }
 }
