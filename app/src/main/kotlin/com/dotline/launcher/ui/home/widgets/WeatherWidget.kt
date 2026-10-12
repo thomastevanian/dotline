@@ -33,6 +33,9 @@ import java.util.Locale
 
 private val WeatherDegreeRows: List<String> = listOf(".#.", "#.#", ".#.")
 
+/** A map pin, 5 x 7 dots. */
+private val PinRows: List<String> = listOf(".###.", "#...#", "#.#.#", "#...#", ".#.#.", "..#..", "..#..")
+
 /** Cards at least this big (dp) get the two-column layout. */
 private const val WIDE_CARD_MIN_WIDTH = 280f
 private const val WIDE_CARD_MIN_HEIGHT = 120f
@@ -84,12 +87,14 @@ private fun WeatherCardBody(
     val kind = if (snapshot != null) snapshot.kind else WeatherKind.UNKNOWN
     val third = when {
         snapshot != null -> WidgetText.dotLine(snapshot.kind.label)
-        needsCity -> "SET A CITY"
+        needsCity -> ""
         error != null -> WidgetText.dotLine(error)
         else -> "LOADING"
     }.ifEmpty { "--" }
-    val lines = remember(today, locale, third) {
-        listOf(WidgetText.weekdayFull(today, locale), WidgetText.dayMonthShort(today, locale), third)
+    val askForCity = needsCity && snapshot == null
+    val lines = remember(today, locale, third, askForCity) {
+        val dateLines = listOf(WidgetText.weekdayFull(today, locale), WidgetText.dayMonthShort(today, locale))
+        if (askForCity) dateLines else dateLines + third
     }
     val temp = if (snapshot != null) WeatherFormat.convert(snapshot.tempC, tempUnit).toString() else "--"
     BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
@@ -102,6 +107,15 @@ private fun WeatherCardBody(
             ) {
                 Column(modifier = Modifier.weight(1f)) {
                     WidgetFineLines(lines = lines, scale = 1.25f, color = colors.primary)
+                }
+                if (askForCity) {
+                    // No city yet: a dot-matrix map pin and the call to action (the whole card is tappable).
+                    Column(horizontalAlignment = Alignment.End) {
+                        DotMatrixIcon(rows = PinRows, pitch = 4.dp, color = colors.primary)
+                        Spacer(Modifier.height(12.dp))
+                        DotText(text = "SET CITY", dot = 3.dp, gap = 1.dp, color = colors.secondary)
+                    }
+                    return@Row
                 }
                 Column(horizontalAlignment = Alignment.End) {
                     WeatherDotIcon(kind = kind, pitch = 3.5f.dp, color = colors.primary)

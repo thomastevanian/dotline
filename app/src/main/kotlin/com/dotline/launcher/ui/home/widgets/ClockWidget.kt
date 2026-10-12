@@ -126,13 +126,13 @@ private fun ClockInlineCard(
         Row(Modifier.fillMaxSize(), verticalAlignment = Alignment.CenterVertically) {
             if (settings.clockStyle == ClockStyle.DOT) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    DotText(text = digits.hours, dot = dot.dp, gap = gap.dp, color = colors.primary)
+                    DotText(text = digits.hours.padStart(2, '0'), dot = dot.dp, gap = gap.dp, color = colors.primary)
                     Spacer(Modifier.height((dot * 2f).dp))
                     DotText(text = digits.minutes, dot = dot.dp, gap = gap.dp, color = colors.primary)
                 }
             } else {
                 ClockNormalText(
-                    digits = digits.copy(amPm = null),
+                    digits = digits.copy(hours = digits.hours.padStart(2, '0'), amPm = null),
                     stacked = true,
                     fontSizeDp = WidgetFit.normalClockFontSize(availW * 0.5f, availH, true, false, 120f),
                     color = colors.primary,

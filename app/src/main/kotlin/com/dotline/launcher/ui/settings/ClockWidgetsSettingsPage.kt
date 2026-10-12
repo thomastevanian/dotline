@@ -35,6 +35,7 @@ import com.dotline.launcher.ui.LocalSettings
 import com.dotline.launcher.ui.components.ChevronIcon
 import com.dotline.launcher.ui.components.CloseIcon
 import com.dotline.launcher.ui.components.DotClock
+import com.dotline.launcher.ui.home.widgets.ClockWidget
 import com.dotline.launcher.ui.components.DotDate
 import com.dotline.launcher.ui.components.PillButton
 import com.dotline.launcher.ui.components.PlusIcon
@@ -344,32 +345,26 @@ fun ClockWidgetsSettingsPage(onBack: () -> Unit, modifier: Modifier = Modifier) 
     }
 }
 
-/** Live preview of the home screen clock and date with the current settings, on a flat card. */
+/** Live preview: the actual home screen clock widget with the current settings. */
 @Composable
 private fun ClockSettingsPreview() {
     val s = LocalSettings.current
     val colors = DotlineTheme.colors
-    val now by rememberNow()
-
-    Column(
-        Modifier
-            .fillMaxWidth()
-            .background(colors.card, DotlineTheme.shapes.card)
-            .padding(24.dp),
-    ) {
-        if (s.hideClock && !s.showDate) {
+    if (s.hideClock && !s.showDate) {
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .background(colors.card, DotlineTheme.shapes.card)
+                .padding(24.dp),
+        ) {
             BasicText(
                 text = "The clock and the date are hidden on the home screen.",
                 style = DotlineTheme.type.small.copy(color = colors.secondary),
             )
-        } else {
-            DotClock(now = now, dot = 5.dp, gap = 2.dp)
-            if (s.showDate) {
-                if (!s.hideClock) {
-                    Spacer(Modifier.height(16.dp))
-                }
-                DotDate(now = now)
-            }
+        }
+    } else {
+        Box(Modifier.fillMaxWidth().height(200.dp)) {
+            ClockWidget(spanX = 5, spanY = 2)
         }
     }
 }

@@ -113,7 +113,8 @@ home; sleep 1
 touch() { adb shell input motionevent "$1" "$2" "$3"; }
 touch DOWN 135 1120; sleep 1.4
 for x in 175 215 255 295 337; do touch MOVE $x 1120; sleep 0.12; done
-sleep 1.3
+# a real finger is never perfectly still: small moves keep the hover timer running
+for i in 1 2 3 4 5 6 7 8; do touch MOVE $((337 + (i % 2) * 3)) 1120; sleep 0.15; done
 shot 10a_folder_hover 0
 touch UP 337 1120; sleep 1.8
 shot 10_folder_created 0.5
