@@ -70,6 +70,43 @@ object DefaultLayout {
             // Keep the first-run page tidy: the preferred apps only, the rest live in the drawer.
             if (layout.pages.size > 1 || layout.pages[0].size >= 1 + cols * 2) break
         }
-        return LayoutEngine.normalize(layout, cols, rows)
+        return LayoutEngine.normalize(withExtraPages(layout, apps, emptySet(), cols, rows, newId), cols, rows)
+    }
+
+    /**
+     * Adds the pages after the first: a widgets page (weather, battery and date side by side, world
+     * clock) and one page with the apps that are not on the home screen yet, so a fresh install can
+     * be swiped through straight away. Nothing already on [layout] is moved or removed.
+     */
+    fun withExtraPages(
+        layout: HomeLayout,
+        apps: List<AppInfo>,
+        hidden: Set<String>,
+        cols: Int,
+        rows: Int,
+        newId: () -> String,
+    ): HomeLayout {
+        val pages = ArrayList(layout.pages)
+        if (pages.size < HomeLayout.MAX_PAGES) pages += listOf(widgetsPage(cols, rows, newId))
+        val placed = LayoutEngine.allApps(layout).toSet()
+        val rest = apps
+            .filter { !it.isWorkProfile && it.key !in placed && it.key.flat !in hidden && it.packageName !in hidden }
+            .distinctBy { it.packageName }
+            .take(cols * rows)
+        if (rest.isNotEmpty() && pages.size < HomeLayout.MAX_PAGES) {
+            pages += listOf(rest.mapIndexed { i, a -> AppItem(newId(), a.key, Placement(i % cols, i / cols)) })
+        }
+        return layout.copy(pages = pages)
+    }
+
+    /** Weather on top, battery next to the date, the world clock at the bottom. Fills a 5 x 6 grid exactly. */
+    private fun widgetsPage(cols: Int, rows: Int, newId: () -> String): List<HomeItem> {
+        val side = 2.coerceAtMost(cols - 1)
+        return listOf(
+            WidgetItem(newId(), BuiltinWidget.WEATHER, Placement(0, 0, cols, 2)),
+            WidgetItem(newId(), BuiltinWidget.BATTERY, Placement(0, 2, side, 2)),
+            WidgetItem(newId(), BuiltinWidget.DATE, Placement(side, 2, cols - side, 2)),
+            WidgetItem(newId(), BuiltinWidget.WORLD_CLOCK, Placement(0, 4, cols, if (rows >= 6) 2 else 1)),
+        )
     }
 }

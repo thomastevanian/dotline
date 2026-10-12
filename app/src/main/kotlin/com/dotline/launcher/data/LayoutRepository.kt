@@ -63,10 +63,25 @@ class LayoutRepository(
             val loaded = withContext(Dispatchers.IO) { readFromDisk() }
             val s = settings.settings.first { settings.loaded.value }
             if (loaded != null) {
-                _layout.value = LayoutEngine.normalize(loaded, s.gridColumns, s.gridRows)
+                var current = LayoutEngine.normalize(loaded, s.gridColumns, s.gridRows)
+                if (!s.homePagesSeeded) {
+                    // One time: a layout from an earlier version has a single page, so there is nothing to
+                    // swipe to. Add the widgets and more-apps pages; everything already placed stays put.
+                    apps.loaded.first { it }
+                    if (current.pages.size == 1) {
+                        val extended = DefaultLayout.withExtraPages(
+                            current, apps.apps.value, s.hiddenApps, s.gridColumns, s.gridRows, LayoutIds::newId,
+                        )
+                        current = LayoutEngine.normalize(extended, s.gridColumns, s.gridRows)
+                        schedulePersist()
+                    }
+                    settings.update { it.copy(homePagesSeeded = true) }
+                }
+                _layout.value = current
             } else {
                 apps.loaded.first { it }
                 _layout.value = DefaultLayout.build(apps.apps.value, s.gridColumns, s.gridRows, LayoutIds::newId)
+                settings.update { it.copy(homePagesSeeded = true) }
                 schedulePersist()
             }
             _ready.value = true

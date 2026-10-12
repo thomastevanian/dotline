@@ -67,6 +67,8 @@ data class Settings(
 
     // App state
     val onboardingDone: Boolean = false,
+    /** True once the widgets / more-apps pages were added to the home screen (see DefaultLayout). */
+    val homePagesSeeded: Boolean = false,
     val defaultHomePrompted: Boolean = false,
 )
 
@@ -111,6 +113,7 @@ object SettingsJson {
         put("doubleTap", s.doubleTap.name)
         put("themeMode", s.themeMode.name)
         put("onboardingDone", s.onboardingDone)
+        put("homePagesSeeded", s.homePagesSeeded)
         put("defaultHomePrompted", s.defaultHomePrompted)
     }
 
@@ -154,6 +157,7 @@ object SettingsJson {
             doubleTap = o.enum("doubleTap", d.doubleTap),
             themeMode = o.enum("themeMode", d.themeMode),
             onboardingDone = o.optBoolean("onboardingDone", d.onboardingDone),
+            homePagesSeeded = o.optBoolean("homePagesSeeded", d.homePagesSeeded),
             defaultHomePrompted = o.optBoolean("defaultHomePrompted", d.defaultHomePrompted),
         )
     }

@@ -40,8 +40,31 @@ class DefaultLayoutTest {
     @Test
     fun emptyDeviceStillYieldsValidLayout() {
         val layout = DefaultLayout.build(emptyList(), 5, 6, ids())
-        assertEquals(1, layout.pages.size)
+        // No apps: the clock page plus the widgets page, so the home screen can still be swiped.
+        assertEquals(2, layout.pages.size)
         assertTrue(layout.dock.isEmpty())
         assertEquals(HomeLayout.MAX_PAGES, 7)
+    }
+
+    @Test
+    fun freshInstallHasSeveralPagesToSwipeThrough() {
+        val apps = (1..40).map { info("app.n$it") } + info("com.android.settings")
+        val layout = DefaultLayout.build(apps, 5, 6, ids())
+        assertEquals(3, layout.pages.size, "clock page, widgets page, more apps")
+        val kinds = layout.pages[1].filterIsInstance<WidgetItem>().map { it.kind }
+        assertTrue(BuiltinWidget.WEATHER in kinds && BuiltinWidget.BATTERY in kinds && BuiltinWidget.WORLD_CLOCK in kinds)
+        assertTrue(layout.pages.all { page -> page.all { LayoutEngine.fits(it.placement, 5, 6) } })
+        assertTrue(layout.pages[1].all { a -> layout.pages[1].none { b -> a !== b && a.placement.overlaps(b.placement) } }, "widgets do not overlap")
+    }
+
+    @Test
+    fun extraPagesKeepWhatIsAlreadyPlacedAndSkipHiddenApps() {
+        val one = HomeLayout(listOf(listOf(AppItem("a", AppKey("app.n1", "app.n1.Main", 0L), com.dotline.launcher.data.model.Placement(0, 0)))))
+        val apps = (1..10).map { info("app.n$it") }
+        val out = DefaultLayout.withExtraPages(one, apps, setOf("app.n2"), 5, 6, ids())
+        assertEquals(one.pages[0], out.pages[0], "first page untouched")
+        val placed = LayoutEngine.allApps(out).map { it.packageName }
+        assertEquals(1, placed.count { it == "app.n1" }, "no duplicate of the app that was already on page one")
+        assertTrue("app.n2" !in placed, "hidden apps are not added")
     }
 }
