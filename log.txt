@@ -1,0 +1,73 @@
+device: sdk_gphone64_x86_64 Physical size: 1080x2400 Physical density: 420
+installed
+shot 01_onboarding_1
+tapped 'Next' at 895 2242
+shot 02_onboarding_2
+tapped 'Next' at 895 2242
+shot 03_onboarding_3
+tapped 'Skip' at 148 2243
+shot 04_home_page1
+shot 05_home_swipe_left
+shot 06_home_swipe_left_again
+shot 07_home_swipe_back
+shot 08_drawer
+shot 09_drawer_search
+shot 10a_folder_hover
+shot 10_folder_created
+shot 11_folder_open
+shot 12_app_menu
+tapped 'Remove from home' at 484 1684
+shot 13_edit_mode
+tapped 'Widgets' at 266 207
+shot 14_widget_picker
+shot 15_widget_picker_scrolled
+tapped 'Settings' at 813 207
+shot 16_settings
+tapped 'Home' at 152 479
+shot 17_home
+tapped 'Icons' at 149 660
+shot 17_icons
+tapped 'Clock and widgets' at 282 841
+shot 17_clock_and_widgets
+tapped 'Drawer' at 166 1022
+shot 17_drawer
+tapped 'Gestures' at 186 1328
+shot 17_gestures
+tapped 'Theme' at 163 1509
+shot 17_theme
+tapped 'Wallpapers' at 206 1815
+shot 17_wallpapers
+tapped 'Sounds' at 171 1996
+shot 17_sounds
+tapped 'Finish the look' at 242 2177
+shot 17_finish_the_look
+WARN: 'Backup and restore' not found; on screen: Clock, 2:19 AM | 02 | Settings | Home screen | Home | 5 x 6 grid | Icons | Monochrome, circle | Clock and widgets | Dot matrix clock | Drawer | Search, recent apps and hidden apps | Behaviour | Gestures | Swipes, pinch and double tap | Theme | Dark | Personalise | Wallpapers | Make a dotted wallpaper | Sounds | Make ringtones and notification sounds | Finish the look | A short guide to the last few steps in Android | Dotline
+tapped 'Backup and restore' at 294 1959
+shot 17_backup_and_restore
+WARN: 'About' not found; on screen: Clock, 2:19 AM | 02 | Settings | Home screen | Home | 5 x 6 grid | Icons | Monochrome, circle | Clock and widgets | Dot matrix clock | Drawer | Search, recent apps and hidden apps | Behaviour | Gestures | Swipes, pinch and double tap | Theme | Dark | Personalise | Wallpapers | Make a dotted wallpaper | Sounds | Make ringtones and notification sounds | Finish the look | A short guide to the last few steps in Android | Dotline
+tapped 'About' at 157 2140
+shot 17_about
+tapped 'Settings' at 813 207
+tapped 'Theme' at 163 1509
+tapped 'Translucent surfaces' at 309 819
+shot 18_theme_translucent
+shot 19_home_translucent
+shot 20_home_translucent_page2
+tapped 'Settings' at 813 207
+tapped 'Theme' at 163 1509
+tapped 'Light' at 541 651
+shot 21_theme_light
+shot 22_home_light
+shot 23_home_light_page1
+tapped 'Search' at 540 2244
+shot 24_drawer_light
+--- upgrade test ---
+installed the previous release
+tapped 'Skip' at 148 2243
+shot 30_old_home
+shot 31_old_swipe_left
+upgraded in place
+shot 32_upgraded_home
+shot 33_upgraded_swipe_left
+shot 34_upgraded_swipe_left_again
+done

@@ -1,0 +1,7 @@
+=== app crash log ===
+cat: files/crash_log.txt: No such file or directory
+=== logcat errors from the app ===
+10-12 02:17:43.913  2766  2766 E FrameTracker: force finish cuj, time out: J<IME_INSETS_ANIMATION::0@1@com.dotline.launcher>
+10-12 02:17:48.119  2766  2766 E FrameTracker: force finish cuj, time out: J<IME_INSETS_ANIMATION::1@1@com.dotline.launcher>
+10-12 02:20:17.799  5600  7172 E UninstallPackageIntentO: Package still installed com.dotline.launcher
+10-12 02:20:37.207   520   788 E AppWidgetServiceImpl: Widget host dead: HostId{user:0, app:10193, hostId:6582132, pkg:com.dotline.launcher}
